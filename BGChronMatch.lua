@@ -34,6 +34,15 @@ local ktMatchTypes =
 	[MatchingGame.MatchType.OpenArena]         = "Arena"
 }
 
+local ktRatingTypesToString = 
+{ 
+	[MatchingGame.RatingType.Arena2v2]          = "Rated Arena (2v2)", 
+	[MatchingGame.RatingType.Arena3v3]          = "Rated Arena (3v3)", 
+	[MatchingGame.RatingType.Arena5v5]          = "Rated Arena (5v5)", 
+	[MatchingGame.RatingType.RatedBattleground] = "Rated Battleground",
+	--[MatchingGame.RatingType.Warplot]           = "Warplot"
+}
+
 function BGChronMatch:new(o)
   o = o or {}   -- create object if user does not provide one
   setmetatable(o, self)
@@ -111,7 +120,9 @@ end
 function BGChronMatch:GetMatchTypeString()
   result = "N/A"
 
-  if self.nMatchType then
+  if self.tRating and self.tRating.nRatingType then
+	result = ktRatingTypesToString[self.tRating.nRatingType]
+  elseif self.nMatchType then
     result = ktMatchTypes[self.nMatchType]
   end
 

@@ -19,6 +19,13 @@ local BGChron = {
 -- Constants
 -----------------------------------------------------------------------------------------------
 
+local ktSupportedTypes = {
+	[MatchingGame.RatingType.Arena2v2]          = true,
+	[MatchingGame.RatingType.Arena3v3]          = true,
+	[MatchingGame.RatingType.Arena5v5]          = true,
+	[MatchingGame.RatingType.RatedBattleground] = true 
+}
+
 local ktRatingTypeToMatchType = 
 { 
 	[MatchingGame.RatingType.Arena2v2]          = MatchingGame.MatchType.Arena, 
@@ -140,7 +147,8 @@ function BGChron:OnPVPMatchQueued()
 	if nMatchType == MatchingGame.MatchType.RatedBattleground then
 		tRating = {
 			["nBeginRating"] = self:GetCurrentRating(MatchingGame.RatingType.RatedBattleground),
-			["nEndRating"]   = nil
+			["nEndRating"]   = nil,
+			["nRatingType"]  = MatchingGame.RatingType.RatedBattleground
 		}
 	end
 
@@ -152,13 +160,11 @@ function BGChron:OnPVPMatchQueued()
 		["tRating"]    = tRating
 	})
 	
-	Print("Queued and TempMatch saved")
-	
 	self.currentMatch = self.bgchrondb.TempMatch
 end
 
 function BGChron:OnPVPMatchEntered()
-	if self.bgchrondb.TempMatch then
+	if not self.currentMatch and self.bgchrondb.TempMatch then
 		-- Restore from backup
 		self.currentMatch = self.bgchrondb.TempMatch
 	end
@@ -172,8 +178,9 @@ function BGChron:OnPVPMatchExited()
 	end
 end
 
+-- TODO: Update last entry with the rating type
 function BGChron:OnPVPRatingUpdated(eRatingType)
-	if eRatingType == MatchingGame.RatingType.RatedBattleground then
+	if ktSupportedTypes[eRatingType] == true then
 		self:UpdateRating(eRatingType)
 	end
 end
@@ -265,9 +272,15 @@ function BGChron:UpdateRating(eRatingType)
 
 	if nMatchType == ktRatingTypeToMatchType[eRatingType] then
 		result = self:GetCurrentRating(ktRatingTypeToMatchType[eRatingType])
+		
+		if not tLastEntry.tRating.nEndRating then
+			tLastEntry.tRating.nEndRating = result
+		end
+		
+		if not tLastEntry.tRating.nRatingType then
+			tLastEntry.tRating.nRatingType = eRatingType
+		end
 	end
-
-	tLastEntry.tRating.nEndRating = result
 end
 
 function BGChron:GetResult(eMyTeam, eWinner)
@@ -358,6 +371,24 @@ end
 
 function BGChron:OnClose( wndHandler, wndControl )
 	self.wndMain:Close()
+end
+
+function BGChron:OnFilterBtnCheck( wndHandler, wndControl, eMouseButton )
+end
+
+function BGChron:OnFilterBtnUncheck( wndHandler, wndControl, eMouseButton )
+end
+
+function BGChron:OnSelectRatedBattlegrounds( wndHandler, wndControl, eMouseButton )
+end
+
+function BGChron:OnSelectArenas( wndHandler, wndControl, eMouseButton )
+end
+
+function BGChron:OnSelectBattlegrounds( wndHandler, wndControl, eMouseButton )
+end
+
+function BGChron:OnSelectOpenArenas( wndHandler, wndControl, eMouseButton )
 end
 
 -----------------------------------------------------------------------------------------------
