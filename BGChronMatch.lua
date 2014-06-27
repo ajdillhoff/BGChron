@@ -29,9 +29,13 @@ local ktMatchTypes =
 {
 	[MatchingGame.MatchType.Battleground]      = "Battleground",
 	[MatchingGame.MatchType.Arena]             = "Rated Arena",
-	[MatchingGame.MatchType.Warplot]           = "Warplot",
+	--[MatchingGame.MatchType.Warplot]           = "Warplot",
 	[MatchingGame.MatchType.RatedBattleground] = "Rated Battleground",
-	[MatchingGame.MatchType.OpenArena]         = "Arena"
+	[MatchingGame.MatchType.OpenArena]         = {
+		[2] = "Open Arena (2v2)",
+		[3] = "Open Arena (3v3)",
+		[5] = "Open Arena (5v5)"
+	}
 }
 
 local ktRatingTypesToString = 
@@ -47,6 +51,7 @@ function BGChronMatch:new(o)
   o = o or {}   -- create object if user does not provide one
   setmetatable(o, self)
   self:_init()
+  self:SetData(o)
   self.__index = self
   return o
 end
@@ -57,6 +62,7 @@ function BGChronMatch:_init()
   self.nMatchType = nil
   self.nResult    = nil
   self.tRating    = nil
+  self.nTeamSize  = nil
   
   self.tFormatKeys = {
 	"strDate",
@@ -81,6 +87,7 @@ function BGChronMatch:SetData(tData)
   self.nMatchType = tData.nMatchType
   self.nResult    = tData.nResult
   self.tRating    = tData.tRating
+  self.nTeamSize  = tData.nTeamSize
 end
 
 -- Returns data formatted for a grid
@@ -103,6 +110,61 @@ function BGChronMatch:GetFormattedSortData()
   }
 end
 
+function BGChronMatch:GenerateRatingInfo()
+	if not self.nMatchType then
+		return
+	end
+	
+	if self.nMatchType == MatchingGame.MatchType.RatedBattleground then
+		self.tRating = {
+			["nBeginRating"] = MatchingGame.GetPvpRating(MatchingGame.RatingType.RatedBattleground).nRating,
+			["nEndRating"]   = nil,
+			["nRatingType"]  = MatchingGame.RatingType.RatedBattleground
+		}
+	elseif self.nMatchType == MatchingGame.MatchType.RatedArena then
+		if self.nTeamSize == 2 then
+			self.tRating = {
+				["nBeginRating"] = MatchingGame.GetPvpRating(MatchingGame.RatingType.Arena2v2).nRating,
+				["nEndRating"]   = nil,
+				["nRatingType"]  = MatchingGame.RatingType.Arena2v2,
+				["strTeamName"]  = self:GetTeamName(MatchingGame.RatingType.Arena2v2)
+			}
+			self.strTeamName = self:GetTeamName(MatchingGame.RatingType.Arena2v2)
+		elseif self.nTeamSize == 3 then
+			self.tRating = {
+				["nBeginRating"] = MatchingGame.GetPvpRating(MatchingGame.RatingType.Arena3v3).nRating,
+				["nEndRating"]   = nil,
+				["nRatingType"]  = MatchingGame.RatingType.Arena3v3,
+				["strTeamName"]  = self:GetTeamName(MatchingGame.RatingType.Arena3v3)
+			}
+		elseif self.nTeamSize == 5 then
+			self.tRating = {
+				["nBeginRating"] = MatchingGame.GetPvpRating(MatchingGame.RatingType.Arena5v5).nRating,
+				["nEndRating"]   = nil,
+				["nRatingType"]  = MatchingGame.RatingType.Arena5v5,
+				["strTeamName"]  = self:GetTeamName(MatchingGame.RatingType.Arena5v5)
+			}
+		end
+	end
+end
+
+function BGChronMatch:GetTeamName(eRatingType)
+	local result = nil
+	local ktRatingTypeToGuildType = {
+		[MatchingGame.RatingType.Arena2v2] = GuildLib.GuildType_ArenaTeam_2v2,
+		[MatchingGame.RatingType.Arena3v3] = GuildLib.GuildType_ArenaTeam_3v3,
+		[MatchingGame.RatingType.Arena5v5] = GuildLib.GuildType_ArenaTeam_5v5
+	}
+
+	for key, tCurrGuild in pairs(GuildLib.GetGuilds()) do
+		if tCurrGuild:GetType() == ktRatingTypeToGuildType[eRatingType] then
+			result = tCurrGuild:GetName()
+		end
+	end
+	
+	return result
+end
+
 -----------------------------------------------------------------------------------------------
 -- Data Formatting Functions
 -----------------------------------------------------------------------------------------------
@@ -121,9 +183,15 @@ function BGChronMatch:GetMatchTypeString()
   result = "N/A"
 
   if self.tRating and self.tRating.nRatingType then
+	-- Rated
 	result = ktRatingTypesToString[self.tRating.nRatingType]
   elseif self.nMatchType then
-    result = ktMatchTypes[self.nMatchType]
+	-- Non Rated
+	if self.nMatchType == MatchingGame.MatchType.OpenArena then
+		result = ktMatchTypes[self.nMatchType][self.nTeamSize]
+	else
+		result = ktMatchTypes[self.nMatchType]
+	end
   end
 
   return result
@@ -146,6 +214,11 @@ end
 
 function BGChronMatch:GetRatingString()
   local result = "N/A"
+  
+  if not self.tRating or not self.tRating.nBeginRating or not self.tRating.nEndRating then
+	return result
+  end
+  
   local nPreviousRating = self.tRating.nBeginRating
   local nCurrentRating  = self.tRating.nEndRating
 
@@ -161,7 +234,7 @@ function BGChronMatch:GetRatingString()
 end
 
 function BGChronMatch:GetDateSortString()
-  local result = nil
+  local result = ""
 
   if self.tDate then
     result = self.tDate.nTickCount
@@ -171,9 +244,9 @@ function BGChronMatch:GetDateSortString()
 end
 
 function BGChronMatch:GetRatingSortString()
-  local result = nil
+  local result = ""
 
-  if self.tRating then
+  if self.tRating and self.tRating.nEndRating then
     return self.tRating.nEndRating
   end
 
