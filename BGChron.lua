@@ -233,6 +233,61 @@ function BGChron:OnPVPMatchFinished(eWinner, eReason, nDeltaTeam1, nDeltaTeam2)
 end
 
 -----------------------------------------------------------------------------------------------
+-- BGChron Finished Events
+-----------------------------------------------------------------------------------------------
+
+function BGChron:OnPVPMatchFinished(eWinner, eReason, nDeltaTeam1, nDeltaTeam2)
+  if not self.wndMain or not self.wndMain:IsValid() or not self.wndMain:IsShown() then
+    return
+  end
+
+  -- Find another way to get the eEventType, this should have been recorded when the event started
+  local peMatch = self.wndMain:GetData().peEvent
+  local eEventType = peMatch:GetEventType()
+
+  if not ktPvPEvents[eEventType] or eEventType == PublicEvent.PublicEventType_PVP_Warplot then
+    return
+  end
+
+  local tMatchState = MatchingGame:GetPVPMatchState()
+  local eMyTeam = nil
+  if tMatchState then
+    eMyTeam = tMatchState.eMyTeam
+  end
+
+  if nDeltaTeam1 and nDeltaTeam2 then
+    self.arRatingDelta =
+    {
+      nDeltaTeam1,
+      nDeltaTeam2
+    }
+  end
+
+  if tMatchState and eEventType == PublicEvent.PublicEventType_PVP_Arena and tMatchState.arTeams then
+    local strMyArenaTeamName = ""
+    local strOtherArenaTeamName = ""
+    local strMyTeamName = ""
+    for idx, tCurr in pairs(tMatchState.arTeams) do
+      local strDelta = ""
+      if self.arRatingDelta then
+        if tCurr.nDelta < 0 then
+          strDelta = String_GetWeaselString(Apollo.GetString("PublicEventStats_NegDelta"), math.abs(self.arRatingDelta[idx]))
+        elseif tCurr.nDelta > 0 then
+          strDelta = String_GetWeaselString(Apollo.GetString("PublicEventStats_PosDelta"), math.abs(self.arRatingDelta[idx]))
+        end
+      end
+
+      if eMyTeam == tCurr.nTeam then
+        strMyArenaTeamName = String_GetWeaselString(Apollo.GetString("PublicEventStats_RatingChange"), tCurr.strName, tCurr.nRating + self.arRatingDelta[idx], strDelta)
+        strMySimpleTeamName = tCurr.strName
+      else
+        strOtherArenaTeamName = String_GetWeaselString(Apollo.GetString("PublicEventStats_RatingChange"), tCurr.strName, tCurr.nRating + self.arRatingDelta[idx], strDelta)
+      end
+    end
+  end
+end
+
+-----------------------------------------------------------------------------------------------
 -- BGChron Functions
 -----------------------------------------------------------------------------------------------
 -- Define general functions here

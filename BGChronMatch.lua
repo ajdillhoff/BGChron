@@ -252,3 +252,190 @@ function BGChronMatch:GetRatingSortString()
 
   return result
 end
+
+-----------------------------------------------------------------------------------------------
+-- Grid Building
+-----------------------------------------------------------------------------------------------
+
+-- ty Carbine
+function BGChronMatch:HelperBuildPvPSharedGrids(wndParent, tMegaList, eEventType)
+  if not tMegaList or not tMegaList.tStatsTeam or not tMegaList.tStatsParticipant then
+    return
+  end
+
+  local wndGridTop  = wndParent:FindChild("PvPTeamGridTop")
+  local wndGridBot  = wndParent:FindChild("PvPTeamGridBot")
+  local wndHeaderTop  = wndParent:FindChild("PvPTeamHeaderTop")
+  local wndHeaderBot  = wndParent:FindChild("PvPTeamHeaderBot")
+
+  local nVScrollPosTop  = wndGridTop:GetVScrollPos()
+  local nVScrollPosBot  = wndGridBot:GetVScrollPos()
+  local nSortedColumnTop  = wndGridTop:GetSortColumn() or 1
+  local nSortedColumnBot  = wndGridBot:GetSortColumn() or 1
+  local bAscendingTop   = wndGridTop:IsSortAscending()
+  local bAscendingBot   = wndGridBot:IsSortAscending()
+  
+  wndGridTop:DeleteAll()
+  wndGridBot:DeleteAll()
+
+  local strMyTeamName = ""
+
+  for key, tCurr in pairs(tMegaList.tStatsTeam) do
+    local wndHeader = nil
+    if not wndHeaderTop:GetData() or wndHeaderTop:GetData() == tCurr.strTeamName then
+      wndHeader = wndHeaderTop
+      wndGridTop:SetData(tCurr.strTeamName)
+      wndHeaderTop:SetData(tCurr.strTeamName)
+    elseif not wndHeaderBot:GetData() or wndHeaderBot:GetData() == tCurr.strTeamName then
+      wndHeader = wndHeaderBot
+      wndGridBot:SetData(tCurr.strTeamName)
+      wndHeaderBot:SetData(tCurr.strTeamName)
+    end
+
+    local strHeaderText = wndHeader:FindChild("PvPHeaderText"):GetData() or ""
+    local crTitleColor = ApolloColor.new("ff7fffb9")
+    local strDamage = String_GetWeaselString(Apollo.GetString("PublicEventStats_Damage"), self:HelperFormatNumber(tCurr.nDamage))
+    local strHealed = String_GetWeaselString(Apollo.GetString("PublicEventStats_Healing"), self:HelperFormatNumber(tCurr.nHealed))
+
+    -- Setting up the team names / headers
+    if eEventType == "CTF" or eEventType == "HoldTheLine" or eEventType == "Sabotage" then
+      if tCurr.strTeamName == "Exiles" then
+        crTitleColor = ApolloColor.new("ff31fcf6")
+      elseif tCurr.strTeamName == "Dominion" then
+        crTitleColor = ApolloColor.new("ffb80000")
+      end
+      local strKDA = String_GetWeaselString(Apollo.GetString("PublicEventStats_KDA"), tCurr.nKills, tCurr.nDeaths, tCurr.nAssists)
+
+      strHeaderText = String_GetWeaselString(Apollo.GetString("PublicEventStats_PvPHeader"), strKDA, strDamage, strHealed)
+    elseif eEventType == "Arena" then
+      strHeaderText = String_GetWeaselString(Apollo.GetString("PublicEventStats_ArenaHeader"), strDamage, strHealed) -- TODO, Rating Change when support is added
+      if tCurr.bIsMyTeam then
+        strMyTeamName = tCurr.strTeamName
+      end
+    elseif eEventType == "Warplot" then
+      strHeaderText = wndHeader:FindChild("PvPHeaderText"):GetData() or ""
+    end
+
+    wndHeader:FindChild("PvPHeaderText"):SetText(strHeaderText)
+    wndHeader:FindChild("PvPHeaderTitle"):SetTextColor(crTitleColor)
+    wndHeader:FindChild("PvPHeaderTitle"):SetText(tCurr.strTeamName)
+  end
+
+  for key, tParticipant in pairs(tMegaList.tStatsParticipant) do
+    local wndGrid = wndGridBot
+    if wndGridTop:GetData() == tParticipant.strTeamName then
+      wndGrid = wndGridTop
+    end
+
+    -- Custom Stats
+    if eEventType == "HoldTheLine" then
+      for idx, tCustomTable in pairs(tParticipant.arCustomStats) do
+        if tCustomTable.strName == Apollo.GetString("PublicEventStats_SecondaryPointCaptured") then
+          tParticipant.nCustomNodesCaptured = tCustomTable.nValue or 0
+        end
+      end
+    elseif eEventType == "CTF" then
+      for idx, tCustomTable in pairs(tParticipant.arCustomStats) do
+        if idx == 1 then
+          tParticipant.nCustomFlagsPlaced = tCustomTable.nValue or 0
+        else
+          tParticipant.bCustomFlagsStolen = tCustomTable.nValue or 0
+        end
+      end
+    end
+  end
+
+  for key, tParticipant in pairs(tMegaList.tStatsParticipant) do
+    local wndGrid = wndGridBot
+    if wndGridTop:GetData() == tParticipant.strTeamName then
+      wndGrid = wndGridTop
+    end
+
+    -- Custom Stats
+    if eEventType == "HoldTheLine" then
+      for idx, tCustomTable in pairs(tParticipant.arCustomStats) do
+        if tCustomTable.strName == Apollo.GetString("PublicEventStats_SecondaryPointCaptured") then
+          tParticipant.nCustomNodesCaptured = tCustomTable.nValue or 0
+        end
+      end
+    elseif eEventType == "CTF" then
+      for idx, tCustomTable in pairs(tParticipant.arCustomStats) do
+        if idx == 1 then
+          tParticipant.nCustomFlagsPlaced = tCustomTable.nValue or 0
+        else
+          tParticipant.bCustomFlagsStolen = tCustomTable.nValue or 0
+        end
+      end
+    end
+
+
+    local wndCurrRow = self:HelperGridFactoryProduce(wndGrid, tParticipant.strName) -- GOTCHA: This is an integer
+    wndGrid:SetCellLuaData(wndCurrRow, 1, tParticipant.strName)
+    for idx, strParticipantKey in pairs(ktParticipantKeys[eEventType]) do
+      local value = tParticipant[strParticipantKey]
+      if type(value) == "number" then
+        wndGrid:SetCellSortText(wndCurrRow, idx, string.format("%8d", value))
+      else
+        wndGrid:SetCellSortText(wndCurrRow, idx, value or 0)
+      end
+
+      local strClassIcon = idx == 1 and kstrClassToMLIcon[tParticipant.eClass] or ""
+
+      wndGrid:SetCellDoc(wndCurrRow, idx, string.format("<T Font=\"CRB_InterfaceSmall\">%s%s</T>", strClassIcon, self:HelperFormatNumber(value)))
+    end
+  end
+
+  wndGridTop:SetVScrollPos(nVScrollPosTop)
+  wndGridBot:SetVScrollPos(nVScrollPosBot)
+  wndGridTop:SetSortColumn(nSortedColumnTop, bAscendingTop)
+  wndGridBot:SetSortColumn(nSortedColumnBot, bAscendingBot)
+  self.wndMain:FindChild("PvPLeaveMatchBtn"):Show(self.tZombieStats)
+  self.wndMain:FindChild("PvPSurrenderMatchBtn"):Show(not self.tZombieStats and eEventType == "WarPlot")
+end
+
+-----------------------------------------------------------------------------------------------
+-- Helpers
+-----------------------------------------------------------------------------------------------
+
+function BGChronMatch:HelperBuildCombinedList(tStatsSelf, tStatsTeam, tStatsParticipants)
+  local tMegaList = {}
+  tMegaList.tStatsSelf = {tStatsSelf}
+
+  if tStatsTeam then
+    for key, tCurr in pairs(tStatsTeam) do
+      if not tMegaList.tStatsTeam then
+        tMegaList.tStatsTeam = {}
+      end
+      table.insert(tMegaList.tStatsTeam, tCurr)
+    end
+  end
+
+  if tStatsParticipants then
+    for key, tCurr in pairs(tStatsParticipants) do
+      if not tMegaList.tStatsParticipant then
+        tMegaList.tStatsParticipant = {}
+      end
+      table.insert(tMegaList.tStatsParticipant, tCurr)
+    end
+  end
+  return tMegaList
+end
+
+function BGChronMatch:HelperFormatNumber(nArg)
+  if tonumber(nArg) and tonumber(nArg) > 10000 then
+    nArg = String_GetWeaselString(Apollo.GetString("PublicEventStats_Thousands"), math.floor(nArg/1000))
+  else
+    nArg = tostring(nArg)
+  end
+  return nArg
+  -- TODO: Consider trimming huge numbers into a more readable format
+end
+
+function BGChronMatch:HelperGridFactoryProduce(wndGrid, tTargetComparison)
+  for nRow = 1, wndGrid:GetRowCount() do
+    if wndGrid:GetCellLuaData(nRow, 1) == tTargetComparison then -- GetCellLuaData args are row, col
+      return nRow
+    end
+  end
+  return wndGrid:AddRow("") -- GOTCHA: This is a row number
+end
