@@ -44,6 +44,16 @@ local ktMatchTypes =
 	[MatchingGame.MatchType.OpenArena]         = "Arena"
 }
 
+local ktPvPEvents =
+{
+  [PublicEvent.PublicEventType_PVP_Arena]                     = true,
+  [PublicEvent.PublicEventType_PVP_Warplot]                   = true,
+  [PublicEvent.PublicEventType_PVP_Battleground_Vortex]       = true,
+  [PublicEvent.PublicEventType_PVP_Battleground_Cannon]       = true,
+  [PublicEvent.PublicEventType_PVP_Battleground_Sabotage]     = true,
+  [PublicEvent.PublicEventType_PVP_Battleground_HoldTheLine]  = true,
+}
+
 local eResultTypes = {
 	Win     = 0,
 	Loss    = 1,
@@ -95,24 +105,28 @@ function BGChron:OnDocLoaded()
 
 	if self.xmlDoc ~= nil and self.xmlDoc:IsLoaded() then
 		self.wndMain = Apollo.LoadForm(self.xmlDoc, "BGChronForm", nil, self)
-		if self.wndMain == nil then
+    self.wndMatchForm = Apollo.LoadForm(self.xmlDoc, "BGChronMatchForm", nil, self)
+		if self.wndMain == nil or self.wndMatchForm == nil then
 			Apollo.AddAddonErrorText(self, "Could not load the main window for some reason.")
 			return
 		end
 		
 		self.wndMain:Show(false, true)
+    self.wndMatchForm:Show(false)
 
 		-- if the xmlDoc is no longer needed, you should set it to nil
 		-- self.xmlDoc = nil
 		
 		-- Register handlers for events, slash commands and timer, etc.
-		Apollo.RegisterSlashCommand("bgchronclear",     	"OnBGChronClear", self)
+		Apollo.RegisterSlashCommand("bgchronclear",     	  "OnBGChronClear", self)
 		Apollo.RegisterSlashCommand("bgchron",              "OnBGChronOn", self)
-		Apollo.RegisterEventHandler("MatchingJoinQueue",	"OnPVPMatchQueued", self)
+		Apollo.RegisterEventHandler("MatchingJoinQueue",	  "OnPVPMatchQueued", self)
 		Apollo.RegisterEventHandler("MatchEntered",         "OnPVPMatchEntered", self)
 		Apollo.RegisterEventHandler("MatchExited",          "OnPVPMatchExited", self)
 		Apollo.RegisterEventHandler("PvpRatingUpdated",     "OnPVPRatingUpdated", self)
 		Apollo.RegisterEventHandler("PVPMatchFinished",     "OnPVPMatchFinished", self)	
+    Apollo.RegisterEventHandler("PublicEventStart",     "OnPublicEventStart", self)
+    Apollo.RegisterEventHandler("PublicEventEnd",       "OnPublicEventEnd", self)
 		
 		-- Form Items
 		self.wndFilterList       = self.wndMain:FindChild("FilterToggleList")
@@ -149,21 +163,15 @@ end
 -----------------------------------------------------------------------------------------------
 
 function BGChron:OnPVPMatchQueued()
-	local tDate = GameLib:GetLocalTime()
 	local tMatchInfo = self:GetMatchInfo()
 	
 	if not tMatchInfo then
 		return
 	end
 
-	tDate["nTickCount"] = GameLib:GetTickCount()
-
 	self.bgchrondb.TempMatch = nil
 	self.bgchrondb.TempMatch = BGChronMatch:new({
-		["tDate"]      = tDate,
 		["nMatchType"] = tMatchInfo.nMatchType,
-		["nResult"]    = nil, 
-		["tRating"]    = nil,
 		["nTeamSize"]  = tMatchInfo.nTeamSize
 	})
 	self.bgchrondb.TempMatch:GenerateRatingInfo()
@@ -171,20 +179,29 @@ function BGChron:OnPVPMatchQueued()
 	self.currentMatch = self.bgchrondb.TempMatch
 end
 
+function BGChron:OnPublicEventStart(peEvent)
+  local eType = peEvent:GetEventType()
+  if self.currentMatch and ktPvPEvents[eType] then
+    self.currentMatch.nEventType = eType
+  end
+end
+
 function BGChron:OnPVPMatchEntered()
 	if not self.currentMatch and self.bgchrondb.TempMatch then
 		-- Restore from backup
 		self.currentMatch = self.bgchrondb.TempMatch
 	else
-		self.currentMatch.nMatchEnteredTick = GameLib:GetTickCount()
+		self.currentMatch.nMatchEnteredTick = os.time()
 	end
 end
 
 function BGChron:OnPVPMatchExited()
 	if self.currentMatch then
-		-- User left before match finished.
-		self.currentMatch.nResult = eResultTypes.Forfeit
-		self.currentMatch.nMatchEndedTick = GameLib:GetTickCount()
+		-- Check if user left before match finished.
+    if not self.currentMatch.nResult then
+		  self.currentMatch.nResult = eResultTypes.Forfeit
+    end
+		self.currentMatch.nMatchEndedTick = os.time()
 		self:UpdateMatchHistory(self.currentMatch)
 	end
 end
@@ -196,64 +213,29 @@ function BGChron:OnPVPRatingUpdated(eRatingType)
 	end
 end
 
-function BGChron:OnPVPMatchFinished(eWinner, eReason, nDeltaTeam1, nDeltaTeam2)
-	if not self.currentMatch then
-		return
-	end
-
-	local tMatchState = MatchingGame:GetPVPMatchState()
-	local eMyTeam = nil
-	local tRatingDeltas = {
-		nDeltaTeam1,
-		nDeltaTeam2
-	}
-	
-	if tMatchState then
-		eMyTeam = tMatchState.eMyTeam
-	end	
-	
-	self.currentMatch.nResult = self:GetResult(eMyTeam, eWinner)
-	self.currentMatch.nMatchEndedTick = GameLib:GetTickCount()
-	
-	if tRatingDeltas then
-		-- Rating Changes Happened
-		if tMatchState.arTeams then
-			local tRating = nil
-			for idx, tCurr in pairs(tMatchState.arTeams) do
-				if eMyTeam == tCurr.nTeam then
-					tRating.nEndRating = tCurr.nRating
-					tRating.nBeginRating = tCurr.nRating - tRatingDeltas[idx]
-				end
-			end
-			self.currentMatch.tRating = tRating
-		end
-	end
-
-	self:UpdateMatchHistory(self.currentMatch)
-end
-
 -----------------------------------------------------------------------------------------------
 -- BGChron Finished Events
 -----------------------------------------------------------------------------------------------
 
 function BGChron:OnPVPMatchFinished(eWinner, eReason, nDeltaTeam1, nDeltaTeam2)
-  if not self.wndMain or not self.wndMain:IsValid() or not self.wndMain:IsShown() then
+  if not self.currentMatch then
     return
   end
+  local eEventType = self.currentMatch.nEventType
 
-  -- Find another way to get the eEventType, this should have been recorded when the event started
-  local peMatch = self.wndMain:GetData().peEvent
-  local eEventType = peMatch:GetEventType()
-
-  if not ktPvPEvents[eEventType] or eEventType == PublicEvent.PublicEventType_PVP_Warplot then
+  if eEventType == nil or not ktPvPEvents[eEventType] or eEventType == PublicEvent.PublicEventType_PVP_Warplot then
     return
   end
 
   local tMatchState = MatchingGame:GetPVPMatchState()
   local eMyTeam = nil
+  local tArenaTeamInfo = nil
   if tMatchState then
     eMyTeam = tMatchState.eMyTeam
   end
+
+  self.currentMatch.nResult = self:GetResult(eMyTeam, eWinner)
+  self.currentMatch.nMatchEndedTick = os.time()
 
   if nDeltaTeam1 and nDeltaTeam2 then
     self.arRatingDelta =
@@ -264,26 +246,27 @@ function BGChron:OnPVPMatchFinished(eWinner, eReason, nDeltaTeam1, nDeltaTeam2)
   end
 
   if tMatchState and eEventType == PublicEvent.PublicEventType_PVP_Arena and tMatchState.arTeams then
-    local strMyArenaTeamName = ""
-    local strOtherArenaTeamName = ""
-    local strMyTeamName = ""
+  	tArenaTeamInfo = {}
     for idx, tCurr in pairs(tMatchState.arTeams) do
-      local strDelta = ""
-      if self.arRatingDelta then
-        if tCurr.nDelta < 0 then
-          strDelta = String_GetWeaselString(Apollo.GetString("PublicEventStats_NegDelta"), math.abs(self.arRatingDelta[idx]))
-        elseif tCurr.nDelta > 0 then
-          strDelta = String_GetWeaselString(Apollo.GetString("PublicEventStats_PosDelta"), math.abs(self.arRatingDelta[idx]))
-        end
-      end
 
       if eMyTeam == tCurr.nTeam then
-        strMyArenaTeamName = String_GetWeaselString(Apollo.GetString("PublicEventStats_RatingChange"), tCurr.strName, tCurr.nRating + self.arRatingDelta[idx], strDelta)
-        strMySimpleTeamName = tCurr.strName
+        tArenaTeamInfo.strPlayerTeamName = tCurr.strName
       else
-        strOtherArenaTeamName = String_GetWeaselString(Apollo.GetString("PublicEventStats_RatingChange"), tCurr.strName, tCurr.nRating + self.arRatingDelta[idx], strDelta)
+        tArenaTeamInfo.strEnemyTeamName  = tCurr.strName
       end
+
+      self.currentMatch.tArenaTeamInfo = tArenaTeamInfo
     end
+  end
+  --self:UpdateMatchHistory(self.currentMatch)
+end
+
+function BGChron:OnPublicEventEnd(peEnding, eReason, tStats)
+
+  local eEventType = peEnding:GetEventType()
+
+  if self.currentMatch and ktPvPEvents[eEventType] then
+    self.currentMatch.tMatchStats = tStats
   end
 end
 
@@ -294,95 +277,6 @@ end
 
 -- on SlashCommand "/bgchron"
 function BGChron:OnBGChronOn()
-	local t = {
-		[3] = {
-			{
-				["tDate"]      = {
-				  ["nHour"] = 1,
-				  ["nSecond"] = 51,
-				  ["nMonth"] = 6,
-				  ["nHour"] = 16,
-				  ["strFormattedTime"] = "1:15:51 AM",
-				  ["nYear"] = 2014,
-				  ["nTickCount"] = 885763218,
-				  ["nDay"] = 25,
-				  ["nDayOfWeek"] = 4,
-				},
-				["nMatchType"] = 3,
-				["nResult"]    = 0,
-				["tRating"]    = {
-				  ["nBeginRating"] = 1000,
-				  ["nEndRating"]   = 1040,
-				  ["nRatingType"]  = 1
-				},
-				["nTeamSize"] = 3
-			},
-		},
-		[0] = {
-			{
-				["tDate"]      = {
-				  ["nHour"] = 1,
-				  ["nSecond"] = 51,
-				  ["nMonth"] = 6,
-				  ["nHour"] = 16,
-				  ["strFormattedTime"] = "1:15:51 AM",
-				  ["nYear"] = 2014,
-				  ["nTickCount"] = 885763218,
-				  ["nDay"] = 25,
-				  ["nDayOfWeek"] = 4,
-				},
-				["nMatchType"] = 0,
-				["nResult"]    = 2,
-				["tRating"]    = {
-				  ["nBeginRating"] = 1000,
-				  ["nEndRating"]   = 1040
-				}
-			},
-		},
-		[6] = {
-			{
-				["tDate"]      = {
-				  ["nHour"] = 1,
-				  ["nSecond"] = 51,
-				  ["nMonth"] = 6,
-				  ["nHour"] = 16,
-				  ["strFormattedTime"] = "1:15:51 AM",
-				  ["nYear"] = 2014,
-				  ["nTickCount"] = 885763218,
-				  ["nDay"] = 25,
-				  ["nDayOfWeek"] = 4,
-				},
-				["nMatchType"] = 6,
-				["nResult"]    = 1,
-				["tRating"]    = {
-				  ["nBeginRating"] = 1000,
-				  ["nEndRating"]   = 1040
-				},
-				["nTeamSize"] = 5
-			},
-		},
-		[5] = {
-			{
-				["tDate"]      = {
-				  ["nHour"] = 1,
-				  ["nSecond"] = 51,
-				  ["nMonth"] = 6,
-				  ["nHour"] = 16,
-				  ["strFormattedTime"] = "1:15:51 AM",
-				  ["nYear"] = 2014,
-				  ["nTickCount"] = 885763218,
-				  ["nDay"] = 25,
-				  ["nDayOfWeek"] = 4,
-				},
-				["nMatchType"] = 5,
-				["nResult"]    = 0,
-				["tRating"]    = {
-				  ["nBeginRating"] = 1000,
-				  ["nEndRating"]   = 1040
-				}
-			},
-		},
-	}
 	
 	-- BGChron:HelperBuildGrid(self.wndMain:FindChild("GridContainer"), self.bgchrondb.MatchHistory)
 	-- self.wndFilterList:Show(false)
@@ -511,7 +405,7 @@ function BGChron:HelperBuildGrid(wndParent, tData)
 
 	local nVScrollPos 	= wndGrid:GetVScrollPos()
 	local nSortedColumn	= wndGrid:GetSortColumn() or 1
-	local bAscending 	= wndGrid:IsSortAscending()
+	local bAscending 	  = wndGrid:IsSortAscending()
 	
 	wndGrid:DeleteAll()
 	
@@ -528,6 +422,8 @@ end
 function BGChron:HelperBuildRow(wndGrid, tMatchData)
 	local chronMatch = BGChronMatch:new(tMatchData)
 	row = wndGrid:AddRow("")
+
+  wndGrid:SetCellLuaData(row, 1, tMatchData)
 	
 	local tValues     = chronMatch:GetFormattedData()
 	local tSortValues = chronMatch:GetFormattedSortData()
@@ -572,6 +468,27 @@ function BGChron:OnSelectOpenArenas( wndHandler, wndControl, eMouseButton )
 	self.eSelectedFilter = MatchingGame.MatchType.OpenArena
 	
 	self:OnBGChronOn()
+end
+
+function BGChron:OnRowClick( wndHandler, wndControl, eMouseButton, nLastRelativeMouseX, nLastRelativeMouseY, bDoubleClick, bStopPropagation )
+	if bDoubleClick then
+		local nSelectedRow = wndHandler:GetCurrentRow()
+    if not nSelectedRow then
+      return
+    end
+		local MatchData    = wndHandler:GetCellLuaData(nSelectedRow, 1)
+		
+		Event_FireGenericEvent("SendVarToRover", "MatchData", MatchData)
+    MatchData:Initialize(self.wndMatchForm)
+	end
+end
+
+---------------------------------------------------------------------------------------------------
+-- BGChronMatchForm Functions
+---------------------------------------------------------------------------------------------------
+
+function BGChron:OnMatchClose( wndHandler, wndControl, eMouseButton )
+	self.wndMatchForm:Show(false)
 end
 
 -----------------------------------------------------------------------------------------------

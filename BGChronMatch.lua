@@ -4,20 +4,194 @@
 --------------------------------
 
 BGChronMatch = {}
-BGChronMatch.__index = BGChronMatch
+-- BGChronMatch.__index = BGChronMatch
 
 
-setmetatable(BGChronMatch, {
-  __call = function(cls, ...)
-    local self = setmetatable({}, cls)
-    self:_init(...)
-    return self
-  end
-})
+-- setmetatable(BGChronMatch, {
+--   __call = function(cls, ...)
+--     local self = setmetatable({}, cls)
+--     -- self:_init(...)
+--     return self
+--   end
+-- })
 
 ---------------------------------------------
 -- Constants
 ---------------------------------------------
+
+local ktParticipantKeys = -- Can swap to event type id's, but this just saves space
+{
+  ["Arena"] =
+  {
+    "strName",
+    "nKills",
+    "nDeaths",
+    "nAssists",
+    "nDamage",
+    "nHealed",
+    "nDamageReceived",
+    "nHealingReceived",
+    "nSaves"
+  },
+
+  ["WarPlot"] =
+  {
+    "strName",
+    "nKills",
+    "nDeaths",
+    "nAssists",
+    "nDamage",
+    "nHealed",
+    "nDamageReceived",
+    "nHealingReceived",
+    "nSaves",
+    "nKillStreak"
+  },
+
+  ["HoldTheLine"] =
+  {
+    "strName",
+    "nKills",
+    "nDeaths",
+    "nAssists",
+    "nCustomNodesCaptured",
+    "nDamage",
+    "nHealed",
+    "nDamageReceived",
+    "nHealingReceived",
+    "nSaves",
+    "nKillStreak"
+  },
+  ["CTF"] =
+  {
+    "strName",
+    "nKills",
+    "nDeaths",
+    "nAssists",
+    "nCustomFlagsPlaced",
+    "bCustomFlagsStolen",
+    "nDamage",
+    "nHealed",
+    "nDamageReceived",
+    "nHealingReceived",
+    "nSaves",
+    "nKillStreak"
+  },
+  ["Sabotage"] =
+  {
+    "strName",
+    "nKills",
+    "nDeaths",
+    "nAssists",
+    "nDamage",
+    "nHealed",
+    "nDamageReceived",
+    "nHealingReceived",
+    "nSaves",
+    "nKillStreak"
+  }
+}
+
+local kstrClassToMLIcon =
+{
+  [GameLib.CodeEnumClass.Warrior]     = "<T Image=\"CRB_Raid:sprRaid_Icon_Class_Warrior\"></T> ",
+  [GameLib.CodeEnumClass.Engineer]    = "<T Image=\"CRB_Raid:sprRaid_Icon_Class_Engineer\"></T> ",
+  [GameLib.CodeEnumClass.Esper]       = "<T Image=\"CRB_Raid:sprRaid_Icon_Class_Esper\"></T> ",
+  [GameLib.CodeEnumClass.Medic]       = "<T Image=\"CRB_Raid:sprRaid_Icon_Class_Medic\"></T> ",
+  [GameLib.CodeEnumClass.Stalker]     = "<T Image=\"CRB_Raid:sprRaid_Icon_Class_Stalker\"></T> ",
+  [GameLib.CodeEnumClass.Spellslinger]  = "<T Image=\"CRB_Raid:sprRaid_Icon_Class_Spellslinger\"></T> ",
+}
+
+local ktPvPEvents =
+{
+  [PublicEvent.PublicEventType_PVP_Arena]           = true,
+  [PublicEvent.PublicEventType_PVP_Warplot]           = true,
+  [PublicEvent.PublicEventType_PVP_Battleground_Vortex]     = true,
+  [PublicEvent.PublicEventType_PVP_Battleground_Cannon]     = true,
+  [PublicEvent.PublicEventType_PVP_Battleground_Sabotage]   = true,
+  [PublicEvent.PublicEventType_PVP_Battleground_HoldTheLine]  = true,
+}
+
+local ktEventTypeToWindowName =
+{
+  [PublicEvent.PublicEventType_PVP_Arena]           = "PvPArenaContainer",
+  [PublicEvent.PublicEventType_PVP_Warplot]           = "PvPWarPlotContainer",
+  [PublicEvent.PublicEventType_PVP_Battleground_HoldTheLine]  = "PvPHoldContainer",
+  [PublicEvent.PublicEventType_PVP_Battleground_Vortex]     = "PvPCTFContainer",
+  [PublicEvent.PublicEventType_PVP_Battleground_Sabotage]   = "PvPSaboContainer",
+}
+
+-- necessary until we can either get column names for a compare/swap or a way to set localized strings in XML for columns
+local ktEventTypeToColumnNameList =
+{
+  [PublicEvent.PublicEventType_PVP_Arena] =
+  {
+    "PublicEventStats_Name",
+    "PublicEventStats_Kills",
+    "PublicEventStats_Deaths",
+    "PublicEventStats_Assists",
+    "PublicEventStats_DamageDone",
+    "PublicEventStats_HealingDone",
+    "PublicEventStats_DamageTaken",
+    "PublicEventStats_HealingTaken",
+    "PublicEventStats_Saves"
+  },
+  [PublicEvent.PublicEventType_PVP_Warplot] =
+  {
+    "PublicEventStats_Name",
+    "PublicEventStats_Kills",
+    "PublicEventStats_Deaths",
+    "PublicEventStats_Assists",
+    "PublicEventStats_DamageDone",
+    "PublicEventStats_HealingDone",
+    "PublicEventStats_DamageTaken",
+    "PublicEventStats_HealingTaken",
+    "PublicEventStats_Saves",
+    "PublicEventStats_KillStreak"
+  },
+  [PublicEvent.PublicEventType_PVP_Battleground_HoldTheLine] =
+  {
+    "PublicEventStats_Name",
+    "PublicEventStats_Kills",
+    "PublicEventStats_Deaths",
+    "PublicEventStats_Assists",
+    "PublicEventStats_Captures",
+    "PublicEventStats_DamageDone",
+    "PublicEventStats_HealingDone",
+    "PublicEventStats_DamageTaken",
+    "PublicEventStats_HealingTaken",
+    "PublicEventStats_Saves",
+    "PublicEventStats_KillStreak"
+  },
+  [PublicEvent.PublicEventType_PVP_Battleground_Vortex] =
+  {
+    "PublicEventStats_Name",
+    "PublicEventStats_Kills",
+    "PublicEventStats_Deaths",
+    "PublicEventStats_Assists",
+    "PublicEventStats_Captures",
+    "PublicEventStats_Stolen",
+    "PublicEventStats_DamageDone",
+    "PublicEventStats_HealingDone",
+    "PublicEventStats_DamageTaken",
+    "PublicEventStats_HealingTaken",
+    "PublicEventStats_Saves",
+    "PublicEventStats_KillStreak"
+  },
+  [PublicEvent.PublicEventType_PVP_Battleground_Sabotage] =
+  {
+    "PublicEventStats_Name",
+    "PublicEventStats_Kills",
+    "PublicEventStats_Deaths",
+    "PublicEventStats_Assists",
+    "PublicEventStats_DamageDone",
+    "PublicEventStats_HealingDone",
+    "PublicEventStats_DamageTaken",
+    "PublicEventStats_HealingTaken",
+    "PublicEventStats_Saves",
+    "PublicEventStats_KillStreak"
+  }
+}
 
 local eResultTypes = {
   Win     = 0,
@@ -50,44 +224,64 @@ local ktRatingTypesToString =
 function BGChronMatch:new(o)
   o = o or {}   -- create object if user does not provide one
   setmetatable(o, self)
-  self:_init()
-  self:SetData(o)
   self.__index = self
+  self:_init()
+  -- self:SetData(o)
   return o
 end
 
 
 function BGChronMatch:_init()
-  self.tDate      = nil
-  self.nMatchType = nil
-  self.nResult    = nil
-  self.tRating    = nil
-  self.nTeamSize  = nil
+  self.nMatchEnteredTick  = nil
+  self.nMatchEndedTick    = nil
+  self.tMatchStats        = nil
+  self.tArenaTeamInfo     = nil
+  self.nMatchType         = nil
+  self.nEventType         = nil
+  self.nMatchResult       = nil
+  self.tRating            = nil
+  self.nTeamSize          = nil
+  self.bQueuedAsGroup     = nil
+  self.nGroupSize         = nil
   
   self.tFormatKeys = {
-	"strDate",
-	"strMatchType",
-	"strResult",
-	"strRating"
+  	"strDate",
+  	"strMatchType",
+  	"strResult",
+  	"strRating",
+    "strMatchTime"
 	}
 end
 
 -- Return raw match data
 function BGChronMatch:GetData()
   return {
-    self.tDate,
+    self.nMatchEnteredTick,
+    self.nMatchEndedTick,
+    self.tMatchStats,
+    self.tArenaTeamInfo,
     self.nMatchType,
-    self.nResult,
-    self.tRating
+    self.nEventType,
+    self.nMatchResult,
+    self.tRating,
+    self.nTeamSize,
+    self.bQueuedAsGroup,
+    self.nGroupSize    
   }
 end
 
 function BGChronMatch:SetData(tData)
-  self.tDate      = tData.tDate
-  self.nMatchType = tData.nMatchType
-  self.nResult    = tData.nResult
-  self.tRating    = tData.tRating
-  self.nTeamSize  = tData.nTeamSize
+  self.nMatchEnteredTick  = tData.nMatchEnteredTick      
+  self.nMatchEndedTick    = tData.nMatchEndedTick        
+  self.tMatchStats        = tData.tMatchStats        
+  self.tArenaTeamInfo     = tData.tArenaTeamInfo     
+  self.nMatchType         = tData.nMatchType         
+  self.nEventType         = tData.nEventType         
+  self.nMatchResult       = tData.nMatchResult       
+  self.tRating            = tData.tRating            
+  self.nTeamSize          = tData.nTeamSize          
+  self.bQueuedAsGroup     = tData.bQueuedAsGroup     
+  self.nGroupSize         = tData.nGroupSize         
 end
 
 -- Returns data formatted for a grid
@@ -96,7 +290,8 @@ function BGChronMatch:GetFormattedData()
     ["strDate"]      = self:GetDateString(),
     ["strMatchType"] = self:GetMatchTypeString(),
     ["strResult"]    = self:GetResultString(),
-    ["strRating"]    = self:GetRatingString()
+    ["strRating"]    = self:GetRatingString(),
+    ["strMatchTime"] = self:GetMatchTimeString()
   }
 end
 
@@ -106,7 +301,8 @@ function BGChronMatch:GetFormattedSortData()
     ["strDate"]      = self:GetDateSortString(),
     ["strMatchType"] = self:GetMatchTypeString(),
     ["strResult"]    = self:GetResultString(),
-    ["strRating"]    = self:GetRatingSortString()
+    ["strRating"]    = self:GetRatingSortString(),
+    ["strMatchTime"] = self:GetMatchTimeSortString()
   }
 end
 
@@ -166,14 +362,60 @@ function BGChronMatch:GetTeamName(eRatingType)
 end
 
 -----------------------------------------------------------------------------------------------
+-- Drawing Method
+-----------------------------------------------------------------------------------------------
+
+function BGChronMatch:Redraw(wndMain)
+  local tData = wndMain:GetData()
+  local tStatsSelf = tData.tStatsSelf
+  local tStatsTeam = tData.tStatsTeam
+  local tStatsParticipants = tData.tStatsParticipants
+  local tMegaList = self:HelperBuildCombinedList(tStatsSelf, tStatsTeam, tStatsParticipants)
+
+  for key, wndCurr in pairs(wndMain:FindChild("MainGridContainer"):GetChildren()) do
+    wndCurr:Show(false)
+  end
+
+  local eEventType = self.nEventType
+  local wndGrid = wndMain:FindChild(ktEventTypeToWindowName[eEventType])
+
+  if eEventType == PublicEvent.PublicEventType_PVP_Battleground_HoldTheLine then
+    self:HelperBuildPvPSharedGrids(wndGrid, tMegaList, "HoldTheLine")
+  elseif eEventType == PublicEvent.PublicEventType_PVP_Battleground_Vortex then
+    self:HelperBuildPvPSharedGrids(wndGrid, tMegaList, "CTF")
+  elseif eEventType == PublicEvent.PublicEventType_PVP_Warplot then
+    self:HelperBuildPvPSharedGrids(wndGrid, tMegaList, "WarPlot")
+  elseif eEventType == PublicEvent.PublicEventType_PVP_Arena then
+    self:HelperBuildPvPSharedGrids(wndGrid, tMegaList, "Arena")
+  elseif eEventType == PublicEvent.PublicEventType_PVP_Battleground_Sabotage then
+    self:HelperBuildPvPSharedGrids(wndGrid, tMegaList, "Sabotage")
+  end
+
+  -- Title Text (including timer)
+  -- TODO: Update this to something useful
+  local strTitleText = "Match Detail"
+  
+  wndMain:FindChild("EventTitleText"):SetText(strTitleText)
+
+  if wndGrid then
+    wndGrid:Show(true)
+  end
+
+  if not wndMain:IsShown() then
+    wndMain:Show(true)
+  end
+end
+
+
+-----------------------------------------------------------------------------------------------
 -- Data Formatting Functions
 -----------------------------------------------------------------------------------------------
 
 function BGChronMatch:GetDateString() 
   local result = "N/A"
 
-  if self.tDate then
-    result = string.format("%02d/%02d/%4d %s", self.tDate["nMonth"], self.tDate["nDay"], self.tDate["nYear"], self.tDate["strFormattedTime"])
+  if self.nMatchEndedTick then
+    result = string.format("%s", os.date("%c", self.nMatchEndedTick))
   end
 
   return result
@@ -182,16 +424,23 @@ end
 function BGChronMatch:GetMatchTypeString()
   result = "N/A"
 
-  if self.tRating and self.tRating.nRatingType then
-	-- Rated
-	result = ktRatingTypesToString[self.tRating.nRatingType]
+  local ktEventTypeToMapName = {
+    [PublicEvent.PublicEventType_PVP_Battleground_Vortex]      = "Walatiki Temple",
+    [PublicEvent.PublicEventType_PVP_Battleground_HoldTheLine] = "Halls of the Bloodsworn"
+  }
+
+  if ktEventTypeToMapName[self.nEventType] ~= nil then
+    result = ktEventTypeToMapName[self.nEventType]
+  elseif self.tRating and self.tRating.nRatingType then
+    -- Rated
+    result = ktRatingTypesToString[self.tRating.nRatingType]
   elseif self.nMatchType then
-	-- Non Rated
-	if self.nMatchType == MatchingGame.MatchType.OpenArena then
-		result = ktMatchTypes[self.nMatchType][self.nTeamSize]
-	else
-		result = ktMatchTypes[self.nMatchType]
-	end
+    -- Non Rated
+    if self.nMatchType == MatchingGame.MatchType.OpenArena then
+  		result = ktMatchTypes[self.nMatchType][self.nTeamSize]
+  	else
+  		result = ktMatchTypes[self.nMatchType]
+  	end
   end
 
   return result
@@ -233,11 +482,23 @@ function BGChronMatch:GetRatingString()
   return result
 end
 
+function BGChronMatch:GetMatchTimeString()
+  local result = "N/A"
+
+  if not self.tMatchStats or not self.tMatchStats.nElapsedTime then
+    return result
+  end
+
+  result = self:HelperConvertTimeToString(self.tMatchStats.nElapsedTime)
+
+  return result
+end
+
 function BGChronMatch:GetDateSortString()
   local result = ""
 
-  if self.tDate then
-    result = self.tDate.nTickCount
+  if self.nMatchEndedTick then
+    result = self.nMatchEndedTick
   end
 
   return result
@@ -253,6 +514,62 @@ function BGChronMatch:GetRatingSortString()
   return result
 end
 
+function BGChronMatch:GetMatchTimeSortString()
+  local result = ""
+
+  if not self.tMatchStats or not self.tMatchStats.nElapsedTime then
+    return result
+  end
+
+  result = self.tMatchStats.nElapsedTime
+
+  return result
+end
+
+function BGChronMatch:Initialize(wndMain)
+
+  if not self.tMatchStats or not next(self.tMatchStats) then
+    return
+  end
+
+  local eEventType = self.nEventType
+  local wndParent = wndMain:FindChild(ktEventTypeToWindowName[eEventType])
+
+  local wndGrid = wndParent
+
+  if wndGrid:GetName() ~= "PublicEventGrid" then
+    wndGrid = wndParent:FindChild("PvPTeamGridBot")
+
+    for idx = 1, wndGrid:GetColumnCount() do
+      wndGrid:SetColumnText(idx, Apollo.GetString(ktEventTypeToColumnNameList[eEventType][idx]))
+    end
+
+    wndGrid = wndParent:FindChild("PvPTeamGridTop")
+  end
+
+  local nMaxWndMainWidth = wndMain:GetWidth() - wndGrid:GetWidth() + 15 -- Magic number for the width of the scroll bar
+  for idx = 1, wndGrid:GetColumnCount() do
+    nMaxWndMainWidth = nMaxWndMainWidth + wndGrid:GetColumnWidth(idx)
+    wndGrid:SetColumnText(idx, Apollo.GetString(ktEventTypeToColumnNameList[eEventType][idx]))
+  end
+
+  wndMain:SetSizingMinimum(500, 500)
+  wndMain:SetSizingMaximum(nMaxWndMainWidth, 800)
+
+  local tData =
+  {
+    tStatsSelf = self.tMatchStats.arPersonalStats or {},
+    tStatsTeam = self.tMatchStats.arTeamStats or {},
+    tStatsParticipants = self.tMatchStats.arParticipantStats or {}
+  }
+
+  wndMain:SetData(tData)
+  wndMain:Show(false)
+
+  self:Redraw(wndMain)
+
+end
+
 -----------------------------------------------------------------------------------------------
 -- Grid Building
 -----------------------------------------------------------------------------------------------
@@ -260,6 +577,10 @@ end
 -- ty Carbine
 function BGChronMatch:HelperBuildPvPSharedGrids(wndParent, tMegaList, eEventType)
   if not tMegaList or not tMegaList.tStatsTeam or not tMegaList.tStatsParticipant then
+    return
+  end
+
+  if not wndParent or not self.tMatchStats then
     return
   end
 
@@ -389,8 +710,6 @@ function BGChronMatch:HelperBuildPvPSharedGrids(wndParent, tMegaList, eEventType
   wndGridBot:SetVScrollPos(nVScrollPosBot)
   wndGridTop:SetSortColumn(nSortedColumnTop, bAscendingTop)
   wndGridBot:SetSortColumn(nSortedColumnBot, bAscendingBot)
-  self.wndMain:FindChild("PvPLeaveMatchBtn"):Show(self.tZombieStats)
-  self.wndMain:FindChild("PvPSurrenderMatchBtn"):Show(not self.tZombieStats and eEventType == "WarPlot")
 end
 
 -----------------------------------------------------------------------------------------------
@@ -429,6 +748,12 @@ function BGChronMatch:HelperFormatNumber(nArg)
   end
   return nArg
   -- TODO: Consider trimming huge numbers into a more readable format
+end
+
+function BGChronMatch:HelperConvertTimeToString(fTime)
+  fTime = math.floor(fTime / 1000) -- TODO convert to full seconds
+
+  return string.format("%d:%02d", math.floor(fTime / 60), math.floor(fTime % 60))
 end
 
 function BGChronMatch:HelperGridFactoryProduce(wndGrid, tTargetComparison)
