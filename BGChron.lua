@@ -603,7 +603,6 @@ function BGChron:OnRowClick( wndHandler, wndControl, eMouseButton, nLastRelative
 	if bDoubleClick then
     local wndGrid = self.wndMain:FindChild("ResultGrid")
 		local nSelectedRow = wndGrid:GetCurrentRow()
-    Print(nSelectedRow)
     if not nSelectedRow then
       return
     end
