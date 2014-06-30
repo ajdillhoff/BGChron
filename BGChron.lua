@@ -26,6 +26,13 @@ local ktSupportedTypes = {
 	[MatchingGame.RatingType.RatedBattleground] = true 
 }
 
+local tArenaFilters = {
+  All    = 0,
+  Twos   = 2,
+  Threes = 3,
+  Fives  = 5
+}
+
 local ktRatingTypeToMatchType = 
 { 
 	[MatchingGame.RatingType.Arena2v2]          = MatchingGame.MatchType.Arena, 
@@ -127,16 +134,34 @@ function BGChron:OnDocLoaded()
 		Apollo.RegisterEventHandler("PVPMatchFinished",     "OnPVPMatchFinished", self)	
     Apollo.RegisterEventHandler("PublicEventStart",     "OnPublicEventStart", self)
     Apollo.RegisterEventHandler("PublicEventEnd",       "OnPublicEventEnd", self)
-		
+
+		---------------------------
 		-- Form Items
+    ---------------------------
+
+    -- Match Type Filter
 		self.wndFilterList       = self.wndMain:FindChild("FilterToggleList")
 		self.wndFilterListToggle = self.wndMain:FindChild("FilterToggle")
 		
 		self.wndFilterListToggle:AttachWindow(self.wndFilterList)
+
+    --  Arena Filter
+    self.wndArenaFilterList       = self.wndMain:FindChild("ArenaFilterToggleList")
+    self.wndArenaFilterListToggle = self.wndMain:FindChild("ArenaFilterToggle")
+    
+    self.wndArenaFilterListToggle:AttachWindow(self.wndArenaFilterList)
+
+    -- Battleground Filter
+    self.wndBattlegroundFilterList       = self.wndMain:FindChild("BattlegroundFilterToggleList")
+    self.wndBattlegroundFilterListToggle = self.wndMain:FindChild("BattlegroundFilterToggle")
+    
+    self.wndBattlegroundFilterListToggle:AttachWindow(self.wndBattlegroundFilterList)
 		
 		self.eSelectedFilter = nil
+    self.eSelectedArenaFilter = tArenaFilters.All
+    self.eSelectedBattlegroundFilter = nil
 		
-		--self:UpdateMatchHistory(self.bgchrondb.TempMatch)
+    -- Initialize Database if necessary
 		if self.bgchrondb.MatchHistory == nil or next(self.bgchrondb.MatchHistory) == nil then
 	
 			self.bgchrondb.MatchHistory = {}
@@ -284,27 +309,48 @@ function BGChron:OnBGChronOn()
 	
 	self.wndMain:Show(true)
 	self.wndFilterList:Show(false)
+  self.wndArenaFilterList:Show(false)
+  self.wndArenaFilterListToggle:Show(false)
+  self.wndBattlegroundFilterList:Show(false)
+  self.wndBattlegroundFilterListToggle:Show(false)
+  local tData = nil
 	
 	-- Move to selected filter, if eligible
 	if self.eSelectedFilter == MatchingGame.MatchType.Battleground then
 		local strMode = Apollo.GetString("MatchMaker_PracticeGrounds")
 		self.wndFilterListToggle:SetText(strMode)
 		self.wndFilterList:FindChild("BattlegroundBtn"):SetCheck(true)
+    self.wndBattlegroundFilterListToggle:Show(true)
+
+    self:UpdateBattlegroundFilterUI()
+    tData = self:FilterBattlegroundDataByType(self.bgchrondb.MatchHistory[self.eSelectedFilter], self.eSelectedBattlegroundFilter)
 	elseif self.eSelectedFilter == MatchingGame.MatchType.Arena then
 		self.wndFilterListToggle:SetText(Apollo.GetString("MatchMaker_Arenas"))
 		self.wndFilterList:FindChild("ArenaBtn"):SetCheck(true)
+    self.wndArenaFilterListToggle:Show(true)
+
+    self:UpdateArenaFilterUI()
+    tData = self:FilterArenaDataByTeamSize(self.bgchrondb.MatchHistory[self.eSelectedFilter], self.eSelectedArenaFilter)
 	elseif self.eSelectedFilter == MatchingGame.MatchType.RatedBattleground then
 		local strMode = Apollo.GetString("CRB_Battlegrounds")
 		self.wndFilterListToggle:SetText(strMode)
 		self.wndFilterList:FindChild("RatedBattlegroundBtn"):SetCheck(true)
+    self.wndBattlegroundFilterListToggle:Show(true)
+
+    self:UpdateBattlegroundFilterUI()
+    tData = self:FilterBattlegroundDataByType(self.bgchrondb.MatchHistory[self.eSelectedFilter], self.eSelectedBattlegroundFilter)
 	elseif self.eSelectedFilter == MatchingGame.MatchType.OpenArena then
 		self.wndFilterListToggle:SetText(Apollo.GetString("MatchMaker_OpenArenas"))
 		self.wndFilterList:FindChild("OpenArenaBtn"):SetCheck(true)
+    self.wndArenaFilterListToggle:Show(true)
+
+    self:UpdateArenaFilterUI()
+    tData = self:FilterArenaDataByTeamSize(self.bgchrondb.MatchHistory[self.eSelectedFilter], self.eSelectedArenaFilter)
 	end
 	
 	-- Build a list
 	if self.eSelectedFilter then
-		BGChron:HelperBuildGrid(self.wndMain:FindChild("GridContainer"), self.bgchrondb.MatchHistory[self.eSelectedFilter])
+		BGChron:HelperBuildGrid(self.wndMain:FindChild("GridContainer"), tData)
 	end
 end
 
@@ -392,7 +438,43 @@ function BGChron:UpdateMatchHistory(tMatch)
 end
 
 -----------------------------------------------------------------------------------------------
--- BGChronForm Functions
+-- BGChron Helpers and Filters
+-----------------------------------------------------------------------------------------------
+
+-- TODO: Can we get better than log(n)?
+-- Filters the arena list using eArenaFilter which coincides with team size
+function BGChron:FilterArenaDataByTeamSize(tData, eArenaFilter)
+  local tResult = {}
+
+  if eArenaFilter == tArenaFilters.All then
+    return tData
+  end
+
+  for key, tMatch in pairs(tData) do
+    if tMatch.nTeamSize == eArenaFilter then
+      table.insert(tResult, tMatch)
+    end
+  end
+  return tResult
+end
+
+function BGChron:FilterBattlegroundDataByType(tData, eBattlegroundFilter)
+  local tResult = {}
+
+  if eBattlegroundFilter == nil then
+    return tData
+  end
+
+  for key, tMatch in pairs(tData) do
+    if tMatch.nEventType == eBattlegroundFilter then
+      table.insert(tResult, tMatch)
+    end
+  end
+  return tResult
+end
+
+-----------------------------------------------------------------------------------------------
+-- BGChronForm Helpers
 -----------------------------------------------------------------------------------------------
 
 function BGChron:HelperBuildGrid(wndParent, tData)
@@ -433,6 +515,39 @@ function BGChron:HelperBuildRow(wndGrid, tMatchData)
 		wndGrid:SetCellSortText(row, col, tSortValues[sFormatKey])
 	end
 end
+
+function BGChron:UpdateArenaFilterUI()
+  if self.eSelectedArenaFilter == tArenaFilters.All then
+    self.wndArenaFilterListToggle:SetText("All")
+    self.wndArenaFilterList:FindChild("ArenaAllBtn"):SetCheck(true)
+  elseif self.eSelectedArenaFilter == tArenaFilters.Twos then
+    self.wndArenaFilterListToggle:SetText("2v2")
+    self.wndArenaFilterList:FindChild("2v2Btn"):SetCheck(true)
+  elseif self.eSelectedArenaFilter == tArenaFilters.Threes then
+    self.wndArenaFilterListToggle:SetText("3v3")
+    self.wndArenaFilterList:FindChild("3v3Btn"):SetCheck(true)
+  elseif self.eSelectedArenaFilter == tArenaFilters.Fives then
+    self.wndArenaFilterListToggle:SetText("5v5")
+    self.wndArenaFilterList:FindChild("5v5Btn"):SetCheck(true)
+  end
+end
+
+function BGChron:UpdateBattlegroundFilterUI()
+  if self.eSelectedBattlegroundFilter == nil then
+    self.wndBattlegroundFilterListToggle:SetText("All")
+    self.wndBattlegroundFilterList:FindChild("BattlegroundAllBtn"):SetCheck(true)
+  elseif self.eSelectedBattlegroundFilter == PublicEvent.PublicEventType_PVP_Battleground_Vortex then
+    self.wndBattlegroundFilterListToggle:SetText("Walatiki Temple")
+    self.wndBattlegroundFilterList:FindChild("WalatikiBtn"):SetCheck(true)
+  elseif self.eSelectedBattlegroundFilter == PublicEvent.PublicEventType_PVP_Battleground_HoldTheLine then
+    self.wndBattlegroundFilterListToggle:SetText("Halls of the Bloodsworn")
+    self.wndBattlegroundFilterList:FindChild("HotBBtn"):SetCheck(true)
+  end
+end
+
+-----------------------------------------------------------------------------------------------
+-- BGChronForm Functions
+-----------------------------------------------------------------------------------------------
 
 function BGChron:OnClose( wndHandler, wndControl )
 	self.wndMain:Close()
@@ -478,11 +593,72 @@ function BGChron:OnRowClick( wndHandler, wndControl, eMouseButton, nLastRelative
     end
 		local MatchData    = wndHandler:GetCellLuaData(nSelectedRow, 1)
 		
-		Event_FireGenericEvent("SendVarToRover", "MatchData", MatchData)
+		--Event_FireGenericEvent("SendVarToRover", "MatchData", wndHandler)
     MatchData:Initialize(self.wndMatchForm)
 	end
 end
 
+-- Arena Filters
+
+function BGChron:OnArenaFilterBtnCheck( wndHandler, wndControl, eMouseButton )
+	self.wndArenaFilterList:Show(true)
+end
+
+function BGChron:OnArenaFilterBtnUncheck( wndHandler, wndControl, eMouseButton )
+	self.wndArenaFilterList:Show(false)
+end
+
+function BGChron:OnSelectArenaFilterAll( wndHandler, wndControl, eMouseButton )
+  self.eSelectedArenaFilter = tArenaFilters.All
+
+  self:OnBGChronOn()
+end
+
+function BGChron:OnSelectArenaFilter2v2( wndHandler, wndControl, eMouseButton )
+  self.eSelectedArenaFilter = tArenaFilters.Twos
+
+  self:OnBGChronOn()
+end
+
+function BGChron:OnSelectArenaFilter3v3( wndHandler, wndControl, eMouseButton )
+  self.eSelectedArenaFilter = tArenaFilters.Threes
+
+  self:OnBGChronOn()
+end
+
+function BGChron:OnSelectArenaFilter5v5( wndHandler, wndControl, eMouseButton )
+  self.eSelectedArenaFilter = tArenaFilters.Fives
+
+  self:OnBGChronOn()
+end
+
+-- Battleground Filters
+
+function BGChron:OnBattlegroundFilterBtnCheck( wndHandler, wndControl, eMouseButton )
+  self.wndBattlegroundFilterList:Show(true)
+end
+
+function BGChron:OnBattlegroundFilterBtnUncheck( wndHandler, wndControl, eMouseButton )
+  self.wndBattlegroundFilterList:Show(false)
+end
+
+function BGChron:OnSelectBattlegroundFilterAll( wndHandler, wndControl, eMouseButton )
+  self.eSelectedBattlegroundFilter = nil
+
+  self:OnBGChronOn()
+end
+
+function BGChron:OnSelectBattlegroundFilterWT( wndHandler, wndControl, eMouseButton )
+  self.eSelectedBattlegroundFilter = PublicEvent.PublicEventType_PVP_Battleground_Vortex
+
+  self:OnBGChronOn()
+end
+
+function BGChron:OnSelectBattlegroundFilterHotB( wndHandler, wndControl, eMouseButton )
+  self.eSelectedBattlegroundFilter = PublicEvent.PublicEventType_PVP_Battleground_HoldTheLine
+
+  self:OnBGChronOn()
+end
 ---------------------------------------------------------------------------------------------------
 -- BGChronMatchForm Functions
 ---------------------------------------------------------------------------------------------------

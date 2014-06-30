@@ -403,6 +403,7 @@ function BGChronMatch:Redraw(wndMain)
 
   if not wndMain:IsShown() then
     wndMain:Show(true)
+    wndMain:ToFront()
   end
 end
 
