@@ -86,6 +86,8 @@ function BGChron:Init()
 	local tDependencies = {}
 	Apollo.RegisterAddon(self, bHasConfigureFunction, strConfigureButtonText, tDependencies)
 
+  self.bIntroShown = false
+
 	self.db = Apollo.GetPackage("Gemini:DB-1.0").tPackage:New(self)
 end
 
@@ -313,7 +315,19 @@ function BGChron:OnBGChronOn()
   self.wndArenaFilterListToggle:Show(false)
   self.wndBattlegroundFilterList:Show(false)
   self.wndBattlegroundFilterListToggle:Show(false)
+  self.wndMain:FindChild("IntroDialog"):Show(false)
   local tData = nil
+
+  -- Show dialog
+  -- DEBUG: Only for intro version
+  self:ShowIntro()
+
+  if self.bIntroShown == false then
+    self.wndFilterListToggle:Show(false)
+    return
+  else
+    self.wndFilterListToggle:Show(true)
+  end
 	
 	-- Move to selected filter, if eligible
 	if self.eSelectedFilter == MatchingGame.MatchType.Battleground then
@@ -668,6 +682,24 @@ end
 
 function BGChron:OnMatchClose( wndHandler, wndControl, eMouseButton )
 	self.wndMatchForm:Show(false)
+end
+
+---------------------------------------------------------------------------------------------------
+-- BGChron Debugging
+---------------------------------------------------------------------------------------------------
+
+function BGChron:ShowIntro()
+  if self.bIntroShown == true then
+    return
+  end
+
+  self.wndMain:FindChild("IntroDialog"):Show(true)
+end
+
+function BGChron:CloseIntro()
+  self.bIntroShown = true
+  self.wndMain:FindChild("IntroDialog"):Show(false)
+  self:OnBGChronOn()
 end
 
 -----------------------------------------------------------------------------------------------
