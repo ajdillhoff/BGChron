@@ -587,14 +587,17 @@ end
 
 function BGChron:OnRowClick( wndHandler, wndControl, eMouseButton, nLastRelativeMouseX, nLastRelativeMouseY, bDoubleClick, bStopPropagation )
 	if bDoubleClick then
-		local nSelectedRow = wndHandler:GetCurrentRow()
+    local wndGrid = self.wndMain:FindChild("ResultGrid")
+		local nSelectedRow = wndGrid:GetCurrentRow()
+    Print(nSelectedRow)
     if not nSelectedRow then
       return
     end
 		local MatchData    = wndHandler:GetCellLuaData(nSelectedRow, 1)
 		
-		--Event_FireGenericEvent("SendVarToRover", "MatchData", wndHandler)
+		Event_FireGenericEvent("SendVarToRover", "MatchData", wndHandler)
     MatchData:Initialize(self.wndMatchForm)
+    wndGrid:SetCurrentRow(-1)
 	end
 end
 
