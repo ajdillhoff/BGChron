@@ -199,7 +199,8 @@ function BGChron:OnPVPMatchQueued()
 	self.bgchrondb.TempMatch = nil
 	self.bgchrondb.TempMatch = BGChronMatch:new({
 		["nMatchType"] = tMatchInfo.nMatchType,
-		["nTeamSize"]  = tMatchInfo.nTeamSize
+		["nTeamSize"]  = tMatchInfo.nTeamSize,
+    ["bQueuedAsGroup"] = tMatchInfo.bQueuedAsGroup
 	})
 	self.bgchrondb.TempMatch:GenerateRatingInfo()
 	
@@ -298,7 +299,7 @@ function BGChron:OnPublicEventEnd(peEnding, eReason, tStats)
 end
 
 -----------------------------------------------------------------------------------------------
--- BGChron Functions
+-- BGChron Slash Commands
 -----------------------------------------------------------------------------------------------
 -- Define general functions here
 
@@ -374,6 +375,10 @@ function BGChron:OnBGChronClear()
 	self.bgchrondb.MatchHistory = {}
 end
 
+-----------------------------------------------------------------------------------------------
+-- BGChron Functions
+-----------------------------------------------------------------------------------------------
+
 function BGChron:UpdateRating(eRatingType)
 	if not self.bgchrondb.MatchHistory then
 		return
@@ -428,6 +433,9 @@ function BGChron:GetMatchInfo()
 					nMatchType = nType,
 					nTeamSize  = matchGame:GetTeamSize()
 				}
+
+        -- Check if solo or group queue
+        result.bQueuedAsGroup = MatchingGame.IsQueuedAsGroup()
 			end
 		end
 	end
@@ -452,7 +460,7 @@ function BGChron:UpdateMatchHistory(tMatch)
 end
 
 -----------------------------------------------------------------------------------------------
--- BGChron Helpers and Filters
+-- BGChron Filters
 -----------------------------------------------------------------------------------------------
 
 -- TODO: Can we get better than log(n)?
@@ -608,7 +616,7 @@ function BGChron:OnRowClick( wndHandler, wndControl, eMouseButton, nLastRelative
     end
 		local MatchData    = wndHandler:GetCellLuaData(nSelectedRow, 1)
 		
-		Event_FireGenericEvent("SendVarToRover", "MatchData", wndHandler)
+		-- Event_FireGenericEvent("SendVarToRover", "MatchData", wndHandler)
     MatchData:Initialize(self.wndMatchForm)
     wndGrid:SetCurrentRow(-1)
 	end
