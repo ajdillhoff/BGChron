@@ -67,8 +67,12 @@ local eResultTypes = {
 	Forfeit = 2
 }
 
--- TODO: This will be expanded to a table if more views are added
-local kEventTypeToWindowName = "ResultGrid"
+local ktMatchTypeToGridName = {
+  [MatchingGame.MatchType.Battleground]      = "BGGrid",
+  [MatchingGame.MatchType.Arena]             = "RArenaGrid",
+  [MatchingGame.MatchType.RatedBattleground] = "RBGGrid",
+  [MatchingGame.MatchType.OpenArena]         = "ArenaGrid"
+}
 
 -----------------------------------------------------------------------------------------------
 -- Initialization
@@ -306,10 +310,6 @@ end
 -- on SlashCommand "/bgchron"
 function BGChron:OnBGChronOn()
 	
-	-- BGChron:HelperBuildGrid(self.wndMain:FindChild("GridContainer"), self.bgchrondb.MatchHistory)
-	-- self.wndFilterList:Show(false)
-	-- self.wndMain:Invoke() -- show the window
-	
 	self.wndMain:Show(true)
 	self.wndFilterList:Show(false)
   self.wndArenaFilterList:Show(false)
@@ -318,6 +318,11 @@ function BGChron:OnBGChronOn()
   self.wndBattlegroundFilterListToggle:Show(false)
   self.wndMain:FindChild("IntroDialog"):Show(false)
   local tData = nil
+
+  -- Hide all grids
+  for key, wndCurr in pairs(self.wndMain:FindChild("GridContainer"):GetChildren()) do
+    wndCurr:Show(false)
+  end
 
   -- Show dialog
   -- DEBUG: Only for intro version
@@ -365,7 +370,7 @@ function BGChron:OnBGChronOn()
 	
 	-- Build a list
 	if self.eSelectedFilter then
-		BGChron:HelperBuildGrid(self.wndMain:FindChild("GridContainer"), tData)
+		self:HelperBuildGrid(self.wndMain:FindChild("GridContainer"), tData)
 	end
 end
 
@@ -420,7 +425,6 @@ function BGChron:GetMatchInfo()
 	{
 		MatchingGame.MatchType.Battleground,
 		MatchingGame.MatchType.Arena,
-		--MatchingGame.MatchType.Warplot,
 		MatchingGame.MatchType.RatedBattleground,
 		MatchingGame.MatchType.OpenArena
 	}
@@ -505,7 +509,8 @@ function BGChron:HelperBuildGrid(wndParent, tData)
 		return
 	end
 
-	local wndGrid = wndParent:FindChild("ResultGrid")
+	local wndGrid = wndParent:FindChild(ktMatchTypeToGridName[self.eSelectedFilter])
+  wndGrid:Show(true)
 
 	local nVScrollPos 	= wndGrid:GetVScrollPos()
 	local nSortedColumn	= wndGrid:GetSortColumn() or 1
@@ -532,7 +537,7 @@ function BGChron:HelperBuildRow(wndGrid, tMatchData)
 	local tValues     = chronMatch:GetFormattedData()
 	local tSortValues = chronMatch:GetFormattedSortData()
 
-	for col, sFormatKey in pairs(BGChronMatch.tFormatKeys) do
+	for col, sFormatKey in pairs(BGChronMatch.ktMatchTypeKeys[tMatchData.nMatchType]) do
 		wndGrid:SetCellText(row, col, tValues[sFormatKey])
 		wndGrid:SetCellSortText(row, col, tSortValues[sFormatKey])
 	end
@@ -609,7 +614,7 @@ end
 
 function BGChron:OnRowClick( wndHandler, wndControl, eMouseButton, nLastRelativeMouseX, nLastRelativeMouseY, bDoubleClick, bStopPropagation )
 	if bDoubleClick then
-    local wndGrid = self.wndMain:FindChild("ResultGrid")
+    local wndGrid = self.wndMain:FindChild(ktMatchTypeToGridName[self.eSelectedFilter])
 		local nSelectedRow = wndGrid:GetCurrentRow()
     if not nSelectedRow then
       return

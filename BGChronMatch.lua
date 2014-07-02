@@ -104,21 +104,21 @@ local kstrClassToMLIcon =
 
 local ktPvPEvents =
 {
-  [PublicEvent.PublicEventType_PVP_Arena]           = true,
-  [PublicEvent.PublicEventType_PVP_Warplot]           = true,
-  [PublicEvent.PublicEventType_PVP_Battleground_Vortex]     = true,
-  [PublicEvent.PublicEventType_PVP_Battleground_Cannon]     = true,
-  [PublicEvent.PublicEventType_PVP_Battleground_Sabotage]   = true,
+  [PublicEvent.PublicEventType_PVP_Arena]                     = true,
+  [PublicEvent.PublicEventType_PVP_Warplot]                   = true,
+  [PublicEvent.PublicEventType_PVP_Battleground_Vortex]       = true,
+  [PublicEvent.PublicEventType_PVP_Battleground_Cannon]       = true,
+  [PublicEvent.PublicEventType_PVP_Battleground_Sabotage]     = true,
   [PublicEvent.PublicEventType_PVP_Battleground_HoldTheLine]  = true,
 }
 
 local ktEventTypeToWindowName =
 {
-  [PublicEvent.PublicEventType_PVP_Arena]           = "PvPArenaContainer",
-  [PublicEvent.PublicEventType_PVP_Warplot]           = "PvPWarPlotContainer",
+  [PublicEvent.PublicEventType_PVP_Arena]                     = "PvPArenaContainer",
+  [PublicEvent.PublicEventType_PVP_Warplot]                   = "PvPWarPlotContainer",
   [PublicEvent.PublicEventType_PVP_Battleground_HoldTheLine]  = "PvPHoldContainer",
-  [PublicEvent.PublicEventType_PVP_Battleground_Vortex]     = "PvPCTFContainer",
-  [PublicEvent.PublicEventType_PVP_Battleground_Sabotage]   = "PvPSaboContainer",
+  [PublicEvent.PublicEventType_PVP_Battleground_Vortex]       = "PvPCTFContainer",
+  [PublicEvent.PublicEventType_PVP_Battleground_Sabotage]     = "PvPSaboContainer",
 }
 
 -- necessary until we can either get column names for a compare/swap or a way to set localized strings in XML for columns
@@ -244,13 +244,39 @@ function BGChronMatch:_init()
   self.bQueuedAsGroup     = nil
   self.nGroupSize         = nil
   
-  self.tFormatKeys = {
-  	"strDate",
-  	"strMatchType",
-  	"strResult",
-  	"strRating",
-    "strMatchTime"
-	}
+  self.ktMatchTypeKeys = {
+    [MatchingGame.MatchType.Battleground]      = {
+      "strDate",
+      "strMatchType",
+      "strResult",
+      "strMatchTime",
+      "strGroupType"
+    },
+    [MatchingGame.MatchType.Arena]             = {
+      "strDate",
+      "strMatchType",
+      "strResult",
+      "strRating",
+      "strMatchTime",
+      "strTeamName"
+    },
+    [MatchingGame.MatchType.RatedBattleground] = {
+      "strDate",
+      "strMatchType",
+      "strResult",
+      "strRating",
+      "strMatchTime",
+      "strGroupType"
+    },
+    [MatchingGame.MatchType.OpenArena]         = {
+      "strDate",
+      "strMatchType",
+      "strResult",
+      "strMatchTime",
+      "strGroupType"
+    }
+  }
+
 end
 
 -- Return raw match data
@@ -291,7 +317,9 @@ function BGChronMatch:GetFormattedData()
     ["strMatchType"] = self:GetMatchTypeString(),
     ["strResult"]    = self:GetResultString(),
     ["strRating"]    = self:GetRatingString(),
-    ["strMatchTime"] = self:GetMatchTimeString()
+    ["strMatchTime"] = self:GetMatchTimeString(),
+    ["strTeamName"]  = self:GetTeamNameString(),
+    ["strGroupType"] = self:GetGroupTypeString()
   }
 end
 
@@ -302,7 +330,9 @@ function BGChronMatch:GetFormattedSortData()
     ["strMatchType"] = self:GetMatchTypeString(),
     ["strResult"]    = self:GetResultString(),
     ["strRating"]    = self:GetRatingSortString(),
-    ["strMatchTime"] = self:GetMatchTimeSortString()
+    ["strMatchTime"] = self:GetMatchTimeSortString(),
+    ["strTeamName"]  = self:GetTeamNameString(),
+    ["strGroupType"] = self:GetGroupTypeString()
   }
 end
 
@@ -491,6 +521,39 @@ function BGChronMatch:GetMatchTimeString()
   end
 
   result = self:HelperConvertTimeToString(self.tMatchStats.nElapsedTime)
+
+  return result
+end
+
+function BGChronMatch:GetGroupTypeString()
+  local result = "N/A"
+
+  if self.bQueuedAsGroup == nil then
+    return result
+  end
+
+  local bQueuedAsGroup = self.bQueuedAsGroup
+
+  if bQueuedAsGroup == true then
+    result = "Group"
+  else
+    result = "Solo"
+  end
+
+  return result
+end
+
+function BGChronMatch:GetTeamNameString()
+  local result = "N/A"
+
+  if not self.tMatchStats or 
+    self.tMatchStats.nMatchType ~= MatchingGame.MatchType.Arena or
+    not self.tMatchStats.tRating or 
+    not self.tMatchStats.tRating.nRatingType then
+    return result
+  end
+
+  result = self:GetTeamName(self.tMatchStats.tRating.nRatingType)
 
   return result
 end

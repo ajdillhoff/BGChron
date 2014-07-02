@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<Addon Author="orbv" APIVersion="8" Name="BGChron" Description="Records PvP match history and details." Version="0.1">
+<Addon Author="orbv" APIVersion="8" Name="BGChron" Description="Records PvP match history and details." Version="0.2">
     <Script Name="libs\GeminiDB\GeminiDB-1.0.lua"/>
     <Script Name="libs\GeminiPackages.lua"/>
     <Script Name="BGChron.lua"/>
