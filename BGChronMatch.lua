@@ -548,14 +548,12 @@ end
 function BGChronMatch:GetTeamNameString()
   local result = "N/A"
 
-  if not self.tMatchStats or 
-    self.tMatchStats.nMatchType ~= MatchingGame.MatchType.Arena or
-    not self.tMatchStats.tRating or 
-    not self.tMatchStats.tRating.nRatingType then
+  if not self.tRating or
+    not self.tRating.strTeamName then
     return result
   end
 
-  result = self:GetTeamName(self.tMatchStats.tRating.nRatingType)
+  result = self.tRating.strTeamName
 
   return result
 end
