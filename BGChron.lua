@@ -238,7 +238,7 @@ function BGChron:OnPVPMatchExited()
 	end
 end
 
--- TODO: Update last entry with the rating type
+-- TODO: This only seems to work for RBG because the rating updates after you leave the match
 function BGChron:OnPVPRatingUpdated(eRatingType)
 	if ktSupportedTypes[eRatingType] == true then
 		self:UpdateRating(eRatingType)
@@ -282,9 +282,11 @@ function BGChron:OnPVPMatchFinished(eWinner, eReason, nDeltaTeam1, nDeltaTeam2)
     for idx, tCurr in pairs(tMatchState.arTeams) do
 
       if eMyTeam == tCurr.nTeam then
-        tArenaTeamInfo.strPlayerTeamName = tCurr.strName
+        --Event_FireGenericEvent("SendVarToRover", "MatchData", tCurr)
+        tArenaTeamInfo.tPlayerTeam = tCurr
+        --Print("You won't believe what I just got")
       else
-        tArenaTeamInfo.strEnemyTeamName  = tCurr.strName
+        tArenaTeamInfo.tEnemyTeam = tCurr
       end
 
       self.currentMatch.tArenaTeamInfo = tArenaTeamInfo
@@ -389,10 +391,19 @@ function BGChron:UpdateRating(eRatingType)
 		return
 	end
 
-	local nLastEntry = #self.bgchrondb.MatchHistory[ktRatingTypeToMatchType[eRatingType]]
-	local tLastEntry = self.bgchrondb.MatchHistory[ktRatingTypeToMatchType[eRatingType]][nLastEntry]
-	local nMatchType = tLastEntry["nMatchType"]
-	local result     = nil
+  local nLastEntry = nil
+  local tLastEntry = nil
+  local nMatchType = nil
+  local result     = self:GetCurrentRating(eRatingType)
+
+  if not self.currentMatch then
+    nLastEntry = #self.bgchrondb.MatchHistory[ktRatingTypeToMatchType[eRatingType]]
+    tLastEntry = self.bgchrondb.MatchHistory[ktRatingTypeToMatchType[eRatingType]][nLastEntry]
+  else
+    tLastEntry = self.currentMatch
+  end
+
+  nMatchType = tLastEntry.nMatchType
 
 	if nMatchType == ktRatingTypeToMatchType[eRatingType] then
 		result = self:GetCurrentRating(eRatingType)

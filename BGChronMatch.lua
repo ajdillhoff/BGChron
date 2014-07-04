@@ -341,13 +341,15 @@ function BGChronMatch:GenerateRatingInfo()
 		return
 	end
 	
+  Print("Generating Rating Info")
+
 	if self.nMatchType == MatchingGame.MatchType.RatedBattleground then
 		self.tRating = {
 			["nBeginRating"] = MatchingGame.GetPvpRating(MatchingGame.RatingType.RatedBattleground).nRating,
 			["nEndRating"]   = nil,
 			["nRatingType"]  = MatchingGame.RatingType.RatedBattleground
 		}
-	elseif self.nMatchType == MatchingGame.MatchType.RatedArena then
+	elseif self.nMatchType == MatchingGame.MatchType.Arena then
 		if self.nTeamSize == 2 then
 			self.tRating = {
 				["nBeginRating"] = MatchingGame.GetPvpRating(MatchingGame.RatingType.Arena2v2).nRating,
