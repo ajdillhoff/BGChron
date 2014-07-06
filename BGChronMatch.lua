@@ -4,16 +4,6 @@
 --------------------------------
 
 BGChronMatch = {}
--- BGChronMatch.__index = BGChronMatch
-
-
--- setmetatable(BGChronMatch, {
---   __call = function(cls, ...)
---     local self = setmetatable({}, cls)
---     -- self:_init(...)
---     return self
---   end
--- })
 
 ---------------------------------------------
 -- Constants

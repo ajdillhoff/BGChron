@@ -90,6 +90,7 @@ function BGChron:Init()
 	local tDependencies = {}
 	Apollo.RegisterAddon(self, bHasConfigureFunction, strConfigureButtonText, tDependencies)
 
+  -- DEBUG: Used for intro message
   self.bIntroShown = false
 
 	self.db = Apollo.GetPackage("Gemini:DB-1.0").tPackage:New(self)
@@ -193,6 +194,11 @@ end
 -- BGChron Events
 -----------------------------------------------------------------------------------------------
 
+--[[
+  NAME:          OnPVPMatchQueued
+  PRECONDITION:  The player is able to queue.
+  POSTCONDITION: Preliminary match information is stored in a temporary table.
+]]
 function BGChron:OnPVPMatchQueued()
 	local tMatchInfo = self:GetMatchInfo()
 	
@@ -211,6 +217,11 @@ function BGChron:OnPVPMatchQueued()
 	self.currentMatch = self.bgchrondb.TempMatch
 end
 
+--[[
+  NAME:          OnPublicEventStart
+  PRECONDITION:  The user is near a public event.
+  POSTCONDITION: If the public event is a valid PVP event, the event type is stored in a temporary table.
+]]
 function BGChron:OnPublicEventStart(peEvent)
   local eType = peEvent:GetEventType()
   if self.currentMatch and ktPvPEvents[eType] then
@@ -218,6 +229,11 @@ function BGChron:OnPublicEventStart(peEvent)
   end
 end
 
+--[[
+  NAME:          OnPVPMatchEntered
+  PRECONDITION:  The user was queued for a valid PVP match and accepted the queue.
+  POSTCONDITION: The current match is restored from a backup if the user had to reload, otherwise the time is saved.
+]]
 function BGChron:OnPVPMatchEntered()
 	if not self.currentMatch and self.bgchrondb.TempMatch then
 		-- Restore from backup
@@ -227,18 +243,12 @@ function BGChron:OnPVPMatchEntered()
 	end
 end
 
-function BGChron:OnPVPMatchExited()
-	if self.currentMatch then
-		-- Check if user left before match finished.
-    if not self.currentMatch.nResult then
-		  self.currentMatch.nResult = eResultTypes.Forfeit
-    end
-		self.currentMatch.nMatchEndedTick = os.time()
-		self:UpdateMatchHistory(self.currentMatch)
-	end
-end
-
 -- TODO: This only seems to work for RBG because the rating updates after you leave the match
+--[[
+  NAME:          OnPVPRatingUpdated
+  PRECONDITION:  The user is eligible to receive a rating update, typically after a rated match is completed.
+  POSTCONDITION: The rating change is saved to the match database.
+]]
 function BGChron:OnPVPRatingUpdated(eRatingType)
 	if ktSupportedTypes[eRatingType] == true then
 		self:UpdateRating(eRatingType)
@@ -246,7 +256,7 @@ function BGChron:OnPVPRatingUpdated(eRatingType)
 end
 
 -----------------------------------------------------------------------------------------------
--- BGChron Finished Events
+-- BGChron Match Leaving Events
 -----------------------------------------------------------------------------------------------
 
 function BGChron:OnPVPMatchFinished(eWinner, eReason, nDeltaTeam1, nDeltaTeam2)
@@ -301,6 +311,17 @@ function BGChron:OnPublicEventEnd(peEnding, eReason, tStats)
 
   if self.currentMatch and ktPvPEvents[eEventType] then
     self.currentMatch.tMatchStats = tStats
+  end
+end
+
+function BGChron:OnPVPMatchExited()
+  if self.currentMatch then
+    -- Check if user left before match finished.
+    if not self.currentMatch.nResult then
+      self.currentMatch.nResult = eResultTypes.Forfeit
+    end
+    self.currentMatch.nMatchEndedTick = os.time()
+    self:UpdateMatchHistory(self.currentMatch)
   end
 end
 
