@@ -94,6 +94,7 @@ function BGChron:Init()
   self.bIntroShown = false
 
 	self.db = Apollo.GetPackage("Gemini:DB-1.0").tPackage:New(self)
+  self.currentMatch = nil
 end
 
 
@@ -235,12 +236,15 @@ end
   POSTCONDITION: The current match is restored from a backup if the user had to reload, otherwise the time is saved.
 ]]
 function BGChron:OnPVPMatchEntered()
-	if not self.currentMatch and self.bgchrondb.TempMatch then
-		-- Restore from backup
-		self.currentMatch = self.bgchrondb.TempMatch
-	else
-		self.currentMatch.nMatchEnteredTick = os.time()
-	end
+  eMatchState = MatchingGame:GetPVPMatchState()
+  if ktSupportedTypes[eMatchState] == true then
+  	if not self.currentMatch and self.bgchrondb.TempMatch then
+  		-- Restore from backup
+  		self.currentMatch = self.bgchrondb.TempMatch
+  	else
+  		self.currentMatch.nMatchEnteredTick = os.time()
+  	end
+  end
 end
 
 -- TODO: This only seems to work for RBG because the rating updates after you leave the match
@@ -555,6 +559,9 @@ function BGChron:HelperBuildGrid(wndParent, tData)
 		self:HelperBuildRow(wndResultGrid, tMatch)
 	end
 
+  -- Calculate Quick Stats
+  self:BuildQuickStats(tData)
+
 	wndGrid:SetVScrollPos(nVScrollPos)
 	wndGrid:SetSortColumn(nSortedColumn, bAscending)
 
@@ -604,31 +611,79 @@ function BGChron:UpdateBattlegroundFilterUI()
   end
 end
 
+function BGChron:BuildQuickStats(tData)
+  winRateLabel = self.wndMain:FindChild("WinRateLabel")
+  matchLengthLabel = self.wndMain:FindChild("MatchLengthLabel")
+
+  -- Set the text for the win rate
+  winRateLabel:SetText(self:GetWinRate(tData))
+
+  -- Set the text for the average match length
+  matchLengthLabel:SetText(self:GetAverageMatchLength(tData))
+end
+
 -----------------------------------------------------------------------------------------------
 -- Statistics Functions
 -----------------------------------------------------------------------------------------------
 
 --[[
-  NAME:          AverageForKey
-  PRECONDITION:  A valid data set and key to access within the data set is given. 
-                 Values are assumed to be numeric.
-                 tData is a table of containing n > 0 tables
-  POSTCONDITION: An average value is returned based on the given data.
+  NAME:          GetWinRate
+  PRECONDITION:  A valid data set is given. 
+                 tData is a table of matches.
+  POSTCONDITION: Win rate data is calculated and returned as a formatted string for display.
 ]]
-function BGChron:AverageForKey(tData, strKey)
-  if not strKey or not tData then
-    return 0
+function BGChron:GetWinRate(tData)
+  result = "Wins: N/A Losses N/A (N/A)"
+
+  if not tData then
+    return result
   end
 
-  count = 0
-  value = 0
+  totalCount = 0
+  winCount = 0
 
   for key, tSubData in pairs(tData) do
-    value = value + tSubData[strKey]
-    count = count + 1
+    if tSubData.nResult == eResultTypes.Win then
+      winCount = winCount + 1
+    end
+    totalCount = totalCount + 1
   end
 
-  return value / count
+  if totalCount > 0 then
+    result = string.format("Wins: %d Losses: %d (%2d%%)", winCount, totalCount - winCount, (winCount / totalCount) * 100)
+  end
+
+  return result
+end
+
+--[[
+  NAME:          GetAverageMatchLength
+  PRECONDITION:  A valid data set is given.
+                 tData is a table of matches.
+  POSTCONDITION: An average of the match length is produced.
+]]
+function BGChron:GetAverageMatchLength(tData)
+  result = "Average Match Length: N/A"
+
+  if not tData then
+    return result
+  end
+
+  totalCount = 0
+  totalTime = 0
+
+  for key, tSubData in pairs(tData) do
+    if tSubData.nMatchEnteredTick and tSubData.nMatchEndedTick then
+      totalTime = totalTime + (tSubData.nMatchEndedTick - tSubData.nMatchEnteredTick)
+      totalCount = totalCount + 1
+    end
+  end
+
+  if totalCount > 0 then
+    result = string.format("Average Match Length: %s", os.date("%M:%S", (totalTime / totalCount)))
+  end
+
+  return result
 end
 
 -----------------------------------------------------------------------------------------------

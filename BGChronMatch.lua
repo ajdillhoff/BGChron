@@ -508,11 +508,12 @@ end
 function BGChronMatch:GetMatchTimeString()
   local result = "N/A"
 
-  if not self.tMatchStats or not self.tMatchStats.nElapsedTime then
+  if not self.nMatchEnteredTick or not self.nMatchEndedTick then
     return result
   end
 
-  result = self:HelperConvertTimeToString(self.tMatchStats.nElapsedTime)
+  nElapsedTime = self.nMatchEndedTick - self.nMatchEnteredTick
+  result = os.date("%M:%S", nElapsedTime)
 
   return result
 end
