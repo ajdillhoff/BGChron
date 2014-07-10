@@ -605,6 +605,33 @@ function BGChron:UpdateBattlegroundFilterUI()
 end
 
 -----------------------------------------------------------------------------------------------
+-- Statistics Functions
+-----------------------------------------------------------------------------------------------
+
+--[[
+  NAME:          AverageForKey
+  PRECONDITION:  A valid data set and key to access within the data set is given. 
+                 Values are assumed to be numeric.
+                 tData is a table of containing n > 0 tables
+  POSTCONDITION: An average value is returned based on the given data.
+]]
+function BGChron:AverageForKey(tData, strKey)
+  if not strKey or not tData then
+    return 0
+  end
+
+  count = 0
+  value = 0
+
+  for key, tSubData in pairs(tData) do
+    value = value + tSubData[strKey]
+    count = count + 1
+  end
+
+  return value / count
+end
+
+-----------------------------------------------------------------------------------------------
 -- BGChronForm Functions
 -----------------------------------------------------------------------------------------------
 
