@@ -94,7 +94,7 @@ function BGChron:Init()
   self.bIntroShown = false
 
 	self.db = Apollo.GetPackage("Gemini:DB-1.0").tPackage:New(self)
-  self.currentMatch = nil
+  -- self.currentMatch = nil
 end
 
 
@@ -181,7 +181,7 @@ function BGChron:OnDocLoaded()
 
 		-- TODO: I feel that this could be done in a more elegant way, clean it up later
 		-- Maybe the UI reloaded so be sure to check if we are in a match already
-		if MatchingGame:IsInMatchingGame() then
+		if MatchingGame:IsInMatchingGame() == true then
 			local tMatchState = MatchingGame:GetPVPMatchState()
 
 			if tMatchState ~= nil then
@@ -202,7 +202,7 @@ end
 ]]
 function BGChron:OnPVPMatchQueued()
 	local tMatchInfo = self:GetMatchInfo()
-	
+
 	if not tMatchInfo then
 		return
 	end
@@ -236,9 +236,9 @@ end
   POSTCONDITION: The current match is restored from a backup if the user had to reload, otherwise the time is saved.
 ]]
 function BGChron:OnPVPMatchEntered()
-  eMatchState = MatchingGame:GetPVPMatchState()
-  if ktSupportedTypes[eMatchState] == true then
-  	if not self.currentMatch and self.bgchrondb.TempMatch then
+  tMatchState = MatchingGame:GetPVPMatchState()
+  if tMatchState ~= nil then
+  	if self.currentMatch == nil and self.bgchrondb.TempMatch ~= nil then
   		-- Restore from backup
   		self.currentMatch = self.bgchrondb.TempMatch
   	else
