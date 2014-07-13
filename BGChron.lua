@@ -133,6 +133,8 @@ function BGChron:OnDocLoaded()
 		-- self.xmlDoc = nil
 		
 		-- Register handlers for events, slash commands and timer, etc.
+    Apollo.RegisterEventHandler("InterfaceMenuListHasLoaded", "OnInterfaceMenuListHasLoaded", self)
+    Apollo.RegisterEventHandler("BGChronOn",            "OnBGChronOn", self)
 		Apollo.RegisterSlashCommand("bgchronclear",     	  "OnBGChronClear", self)
 		Apollo.RegisterSlashCommand("bgchron",              "OnBGChronOn", self)
 		Apollo.RegisterEventHandler("MatchingJoinQueue",	  "OnPVPMatchQueued", self)
@@ -194,6 +196,10 @@ end
 -----------------------------------------------------------------------------------------------
 -- BGChron Events
 -----------------------------------------------------------------------------------------------
+
+function BGChron:OnInterfaceMenuListHasLoaded()
+  Event_FireGenericEvent("InterfaceMenuList_NewAddOn", "BGChron", {"BGChronOn", "", ""})
+end
 
 --[[
   NAME:          OnPVPMatchQueued
