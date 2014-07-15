@@ -19,6 +19,90 @@ local BGChron = {
 -- Constants
 -----------------------------------------------------------------------------------------------
 
+local PixiePlot = Apollo.GetPackage("Drafto:Lib:PixiePlot-1.4").tPackage
+
+local tGraphOptions = {
+  ePlotStyle = PixiePlot.LINE,
+  eCoordinateSystem = PixiePlot.CARTESIAN,
+
+  fYLabelMargin = 40,
+  fXLabelMargin = 25,
+  fPlotMargin = 10,
+  strXLabel = "Match",
+  strYLabel = "Rating",
+  bDrawXAxisLabel = false,
+  bDrawYAxisLabel = false,
+  nXValueLabels = 8,
+  nYValueLabels = 8,
+  bDrawXValueLabels = false,
+  bDrawYValueLabels = true,
+  bPolarGridLines = false,
+  bDrawXGridLines = false,
+  bDrawYGridLines = true,
+  fXGridLineWidth = 1,
+  fYGridLineWidth = 1,
+  clrXGridLine = clrGrey,
+  clrYGridLine = clrGrey,
+  clrXAxisLabel = clrClear,
+  clrYAxisLabel = clrClear,
+  clrXValueLabel = nil,
+  clrYValueLabel = nil,
+  clrXValueBackground = nil,
+  clrYValueBackground = {
+    a = 0,
+    r = 1,
+    g = 1,
+    b = 1
+  },
+  fXAxisLabelOffset = 170,
+  fYAxisLabelOffset = 120,
+  strLabelFont = "CRB_Interface9",
+  fXValueLabelTilt = 20,
+  fYValueLabelTilt = 0,
+  nXLabelDecimals = 1,
+  nYLabelDecimals = 0,
+  xValueFormatter = nil,
+  yValueFormatter = nil,
+
+  bDrawXAxis = true,
+  bDrawYAxis = true,
+  clrXAxis = clrWhite,
+  clrYAxis = clrWhite,
+  fXAxisWidth = 2,
+  fYAxisWidth = 2,
+
+  bDrawSymbol = true,
+  fSymbolSize = nil,
+  strSymbolSprite = "WhiteCircle",
+  clrSymbol = nil,
+
+  strLineSprite = nil,
+  fLineWidth = 3,
+  bScatterLine = false,
+
+  fBarMargin = 5,     -- Space between bars in each group
+  fBarSpacing = 20,   -- Space between groups of bars
+  fBarOrientation = PixiePlot.VERTICAL,
+  strBarSprite = "",
+  strBarFont = "CRB_Interface11",
+  clrBarLabel = clrWhite,
+
+  bWndOverlays = false,
+  fWndOverlaySize = 6,
+  wndOverlayMouseEventCallback = nil,
+  wndOverlayLoadCallback = nil,
+
+  aPlotColors = {
+    {a=1,r=0.858,g=0.368,b=0.53},
+    {a=1,r=0.363,g=0.858,b=0.500},
+    {a=1,r=0.858,g=0.678,b=0.368},
+    {a=1,r=0.368,g=0.796,b=0.858},
+    {a=1,r=0.58,g=0.29,b=0.89},
+    {a=1,r=0.27,g=0.78,b=0.20}
+  }
+}
+
+
 local ktSupportedTypes = {
 	[MatchingGame.RatingType.Arena2v2]          = true,
 	[MatchingGame.RatingType.Arena3v3]          = true,
@@ -93,6 +177,8 @@ function BGChron:Init()
   -- DEBUG: Used for intro message
   self.bIntroShown = false
 
+  self.bGraphShown = false
+
 	self.db = Apollo.GetPackage("Gemini:DB-1.0").tPackage:New(self)
   -- self.currentMatch = nil
 end
@@ -125,6 +211,10 @@ function BGChron:OnDocLoaded()
 			Apollo.AddAddonErrorText(self, "Could not load the main window for some reason.")
 			return
 		end
+
+    -- PixiePlot Initialization
+    self.wndGraph = self.wndMain:FindChild("GraphContainer")
+    self.plot = PixiePlot:New(self.wndGraph, tGraphOptions)
 		
 		self.wndMain:Show(false, true)
     self.wndMatchForm:Show(false)
@@ -344,11 +434,19 @@ end
 function BGChron:OnBGChronOn()
 	
 	self.wndMain:Show(true)
+  self.wndGraph:Show(false)
+
+  -- TODO: Clean these calls up by abstracting
+  self.wndMain:FindChild("BackButton"):Show(false)
+  self.wndMain:FindChild("GraphButton"):Show(false)
+  self.wndMain:FindChild("EmptyDialog"):Show(false)
+
 	self.wndFilterList:Show(false)
   self.wndArenaFilterList:Show(false)
   self.wndArenaFilterListToggle:Show(false)
   self.wndBattlegroundFilterList:Show(false)
   self.wndBattlegroundFilterListToggle:Show(false)
+  self.wndMain:FindChild("GridContainer"):Show(false)
   self.wndMain:FindChild("IntroDialog"):Show(false)
   local tData = nil
 
@@ -376,14 +474,31 @@ function BGChron:OnBGChronOn()
     self.wndBattlegroundFilterListToggle:Show(true)
 
     self:UpdateBattlegroundFilterUI()
-    tData = self:FilterBattlegroundDataByType(self.bgchrondb.MatchHistory[self.eSelectedFilter], self.eSelectedBattlegroundFilter)
+    self.tData = self:FilterBattlegroundDataByType(self.bgchrondb.MatchHistory[self.eSelectedFilter], self.eSelectedBattlegroundFilter)
+
+    if next(self.tData) == nil then
+      self.wndMain:FindChild("EmptyDialog"):Show(true)
+    else
+      self.wndMain:FindChild("GridContainer"):Show(true)
+    end
 	elseif self.eSelectedFilter == MatchingGame.MatchType.Arena then
 		self.wndFilterListToggle:SetText(Apollo.GetString("MatchMaker_Arenas"))
 		self.wndFilterList:FindChild("ArenaBtn"):SetCheck(true)
     self.wndArenaFilterListToggle:Show(true)
 
     self:UpdateArenaFilterUI()
-    tData = self:FilterArenaDataByTeamSize(self.bgchrondb.MatchHistory[self.eSelectedFilter], self.eSelectedArenaFilter)
+    self.tData = self:FilterArenaDataByTeamSize(self.bgchrondb.MatchHistory[self.eSelectedFilter], self.eSelectedArenaFilter)
+
+    Event_FireGenericEvent("SendVarToRover", "tData", self.tData)
+
+    if next(self.tData) == nil then
+      self.wndMain:FindChild("EmptyDialog"):Show(true)
+    elseif self.bGraphShown then
+      self:ShowPlot()
+    else
+      self.wndMain:FindChild("GridContainer"):Show(true)
+      self.wndMain:FindChild("GraphButton"):Show(true)
+    end
 	elseif self.eSelectedFilter == MatchingGame.MatchType.RatedBattleground then
 		local strMode = Apollo.GetString("CRB_Battlegrounds")
 		self.wndFilterListToggle:SetText(strMode)
@@ -391,19 +506,35 @@ function BGChron:OnBGChronOn()
     self.wndBattlegroundFilterListToggle:Show(true)
 
     self:UpdateBattlegroundFilterUI()
-    tData = self:FilterBattlegroundDataByType(self.bgchrondb.MatchHistory[self.eSelectedFilter], self.eSelectedBattlegroundFilter)
+    self.tData = self:FilterBattlegroundDataByType(self.bgchrondb.MatchHistory[self.eSelectedFilter], self.eSelectedBattlegroundFilter)
+
+    if next(self.tData) == nil then
+      self.wndMain:FindChild("EmptyDialog"):Show(true)
+    elseif self.bGraphShown then
+      self:ShowPlot()
+    else
+      self.wndMain:FindChild("GridContainer"):Show(true)
+      self.wndMain:FindChild("GraphButton"):Show(true)
+    end
 	elseif self.eSelectedFilter == MatchingGame.MatchType.OpenArena then
+    -- self.wndMain:FindChild("GridContainer"):Show(true)
 		self.wndFilterListToggle:SetText(Apollo.GetString("MatchMaker_OpenArenas"))
 		self.wndFilterList:FindChild("OpenArenaBtn"):SetCheck(true)
     self.wndArenaFilterListToggle:Show(true)
 
     self:UpdateArenaFilterUI()
-    tData = self:FilterArenaDataByTeamSize(self.bgchrondb.MatchHistory[self.eSelectedFilter], self.eSelectedArenaFilter)
+    self.tData = self:FilterArenaDataByTeamSize(self.bgchrondb.MatchHistory[self.eSelectedFilter], self.eSelectedArenaFilter)
+
+    if next(self.tData) == nil then
+      self.wndMain:FindChild("EmptyDialog"):Show(true)
+    else
+      self.wndMain:FindChild("GridContainer"):Show(true)
+    end
 	end
 	
 	-- Build a list
 	if self.eSelectedFilter then
-		self:HelperBuildGrid(self.wndMain:FindChild("GridContainer"), tData)
+		self:HelperBuildGrid(self.wndMain:FindChild("GridContainer"), self.tData)
 	end
 end
 
@@ -523,6 +654,7 @@ function BGChron:FilterArenaDataByTeamSize(tData, eArenaFilter)
       table.insert(tResult, tMatch)
     end
   end
+
   return tResult
 end
 
@@ -626,6 +758,24 @@ function BGChron:BuildQuickStats(tData)
 
   -- Set the text for the average match length
   matchLengthLabel:SetText(self:GetAverageMatchLength(tData))
+end
+
+function BGChron:BuildGraphDataSet(tData)
+  local low = 9999
+  local tRatings = {}
+  for key, tMatch in pairs(tData) do
+    if tMatch.tRating then
+      local nRating = tMatch.tRating.nEndRating
+      if nRating then
+        table.insert(tRatings, nRating)
+        if nRating < low then
+          low = nRating
+        end
+      end
+    end
+  end
+
+  return {xStart = low, values = tRatings }
 end
 
 -----------------------------------------------------------------------------------------------
@@ -808,6 +958,33 @@ function BGChron:OnSelectBattlegroundFilterHotB( wndHandler, wndControl, eMouseB
 
   self:OnBGChronOn()
 end
+
+function BGChron:ShowPlot( wndHandler, wndControl, eMouseButton )
+
+  if not self.tData or self.tData == {} then
+    return
+  end
+
+  self.plot:RemoveAllDataSets()
+  self.bGraphShown = true
+  self.wndGraph:Show(true)
+  self.wndMain:FindChild("GridContainer"):Show(false)
+  self.wndMain:FindChild("GraphButton"):Show(false)
+  self.wndMain:FindChild("BackButton"):Show(true)
+
+  self.plot:AddDataSet(self:BuildGraphDataSet(self.tData))
+  self.plot:Redraw()
+end
+
+function BGChron:HidePlot( wndHandler, wndControl, eMouseButton )
+  self.plot:RemoveAllDataSets()
+  self.wndMain:FindChild("GraphButton"):Show(true)
+  self.wndMain:FindChild("BackButton"):Show(false)
+  self.wndGraph:Show(false)
+  self.wndMain:FindChild("GridContainer"):Show(true)
+  self.bGraphShown = false
+end
+
 ---------------------------------------------------------------------------------------------------
 -- BGChronMatchForm Functions
 ---------------------------------------------------------------------------------------------------
