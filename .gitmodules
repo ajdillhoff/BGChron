@@ -1,0 +1,3 @@
+[submodule "PixiePlot"]
+        path = libs/PixiePlot
+        url = https://github.com/wildstarnasa/PixiePlot.git
